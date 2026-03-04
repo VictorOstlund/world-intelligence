@@ -25,6 +25,13 @@ export async function register() {
       }
     }
 
+    // Skip scheduler on Vercel (serverless — no persistent processes)
+    const isVercel = !!process.env.VERCEL
+    if (isVercel) {
+      console.log('[instrumentation] Vercel detected — skipping scheduler (use /api/pipeline/run via cron instead)')
+      return
+    }
+
     console.log(`[instrumentation] Starting pipeline scheduler — every ${scheduleHours} hour(s)`)
 
     startScheduler(scheduleHours, async (now: Date) => {
