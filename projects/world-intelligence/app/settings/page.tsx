@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { getModelsWithCustom } from '../../lib/models'
+import { getModelsWithCustom, PROVIDER_MODELS } from '../../lib/models'
 
 interface ProviderEntry {
   apiKey?: string
@@ -22,6 +22,21 @@ interface Config {
 interface CategoryConfig {
   enabled: boolean
   itemBudget: number
+}
+
+interface ProviderModelMemory {
+  triage: string
+  synthesis: string
+  triageFallbacks: string[]
+  synthFallbacks: string[]
+}
+
+function getDefaultModels(provider: string): { triage: string; synthesis: string } {
+  const models = PROVIDER_MODELS[provider] || []
+  return {
+    triage: models[0]?.value || '',
+    synthesis: models[models.length - 1]?.value || '',
+  }
 }
 
 const PROVIDERS = ['anthropic', 'openai', 'azure', 'gemini'] as const
@@ -63,6 +78,7 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false)
   const [saveMsg, setSaveMsg] = useState<string | null>(null)
   const [savedKeys, setSavedKeys] = useState<Record<string, boolean>>({})
+  const [modelMemory, setModelMemory] = useState<Record<string, ProviderModelMemory>>({})
 
   useEffect(() => {
     Promise.all([
@@ -81,6 +97,15 @@ export default function SettingsPage() {
       setSavedKeys(keySaved)
       setConfig(cfg)
       setCategories(cats)
+      const initProvider = cfg.active_provider || 'anthropic'
+      setModelMemory({
+        [initProvider]: {
+          triage: cfg.triage_model || '',
+          synthesis: cfg.synthesis_model || '',
+          triageFallbacks: parseFallbacks(cfg.triage_fallbacks),
+          synthFallbacks: parseFallbacks(cfg.synthesis_fallbacks),
+        },
+      })
     }).finally(() => setLoading(false))
   }, [])
 
@@ -121,6 +146,51 @@ export default function SettingsPage() {
 
   function setCategoryField(name: string, field: keyof CategoryConfig, value: boolean | number) {
     setCategories(c => ({ ...c, [name]: { ...c[name], [field]: value } }))
+  }
+
+  function handleProviderChange(newProvider: string) {
+    const oldProvider = config.active_provider || 'anthropic'
+    const snapshot: ProviderModelMemory = {
+      triage: config.triage_model || '',
+      synthesis: config.synthesis_model || '',
+      triageFallbacks: parseFallbacks(config.triage_fallbacks),
+      synthFallbacks: parseFallbacks(config.synthesis_fallbacks),
+    }
+    setModelMemory(mem => ({ ...mem, [oldProvider]: snapshot }))
+
+    const remembered = modelMemory[newProvider]
+    const defaults = getDefaultModels(newProvider)
+
+    setConfig(c => ({
+      ...c,
+      active_provider: newProvider,
+      triage_model: remembered?.triage ?? defaults.triage,
+      synthesis_model: remembered?.synthesis ?? defaults.synthesis,
+      triage_fallbacks: JSON.stringify(remembered?.triageFallbacks ?? []),
+      synthesis_fallbacks: JSON.stringify(remembered?.synthFallbacks ?? []),
+    }))
+  }
+
+  function handleModelChange(field: 'triage_model' | 'synthesis_model', value: string) {
+    const provider = config.active_provider || 'anthropic'
+    setConfigField(field, value)
+    setModelMemory(mem => {
+      const prev = mem[provider] || { triage: '', synthesis: '', triageFallbacks: [], synthFallbacks: [] }
+      const memField = field === 'triage_model' ? 'triage' : 'synthesis'
+      return { ...mem, [provider]: { ...prev, [memField]: value } }
+    })
+  }
+
+  function handleFallbackChange(key: 'triage_fallbacks' | 'synthesis_fallbacks', idx: number, value: string) {
+    const provider = config.active_provider || 'anthropic'
+    setFallback(key, idx, value)
+    setModelMemory(mem => {
+      const prev = mem[provider] || { triage: '', synthesis: '', triageFallbacks: [], synthFallbacks: [] }
+      const fbKey = key === 'triage_fallbacks' ? 'triageFallbacks' : 'synthFallbacks'
+      const updated = [...prev[fbKey]]
+      updated[idx] = value
+      return { ...mem, [provider]: { ...prev, [fbKey]: updated.filter(Boolean) } }
+    })
   }
 
   async function handleSave() {
@@ -185,7 +255,7 @@ export default function SettingsPage() {
           <label className="block text-xs text-wi-secondary mb-1.5">Active provider</label>
           <select
             value={config.active_provider || 'anthropic'}
-            onChange={e => setConfigField('active_provider', e.target.value)}
+            onChange={e => handleProviderChange(e.target.value)}
             className="w-full px-3 py-2 text-sm border border-wi-border rounded-lg bg-wi-input text-wi-text focus:outline-none focus:ring-2 focus:ring-wi-accent/40 focus:border-wi-accent transition-colors"
           >
             {PROVIDERS.map(p => <option key={p} value={p}>{p}</option>)}
@@ -234,7 +304,7 @@ export default function SettingsPage() {
               <ModelSelect
                 provider={config.active_provider || 'anthropic'}
                 value={config.triage_model || ''}
-                onChange={v => setConfigField('triage_model', v)}
+                onChange={v => handleModelChange('triage_model', v)}
               />
               <p className="text-[11px] text-wi-secondary mt-1.5">Fallbacks (up to 2):</p>
               {[0, 1].map(i => (
@@ -242,7 +312,7 @@ export default function SettingsPage() {
                   key={i}
                   provider={config.active_provider || 'anthropic'}
                   value={triageFallbacks[i] || ''}
-                  onChange={v => setFallback('triage_fallbacks', i, v)}
+                  onChange={v => handleFallbackChange('triage_fallbacks', i, v)}
                   placeholder={`Fallback ${i + 1}`}
                 />
               ))}
@@ -252,7 +322,7 @@ export default function SettingsPage() {
               <ModelSelect
                 provider={config.active_provider || 'anthropic'}
                 value={config.synthesis_model || ''}
-                onChange={v => setConfigField('synthesis_model', v)}
+                onChange={v => handleModelChange('synthesis_model', v)}
               />
               <p className="text-[11px] text-wi-secondary mt-1.5">Fallbacks (up to 2):</p>
               {[0, 1].map(i => (
@@ -260,7 +330,7 @@ export default function SettingsPage() {
                   key={i}
                   provider={config.active_provider || 'anthropic'}
                   value={synthFallbacks[i] || ''}
-                  onChange={v => setFallback('synthesis_fallbacks', i, v)}
+                  onChange={v => handleFallbackChange('synthesis_fallbacks', i, v)}
                   placeholder={`Fallback ${i + 1}`}
                 />
               ))}
