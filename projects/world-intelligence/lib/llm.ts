@@ -45,6 +45,13 @@ const PRICE_TABLE: Record<string, { input: number; output: number }> = {
   'gemini-1.5-flash': { input: 0.075, output: 0.3 },
   'gemini-1.5-pro': { input: 1.25, output: 5.0 },
   'gemini-2.0-flash': { input: 0.1, output: 0.4 },
+  'gemini-3.1-flash-lite-preview': { input: 0.01, output: 0.04 },
+  'gemini-2.5-flash-lite': { input: 0.02, output: 0.08 },
+  'gemini-2.5-flash': { input: 0.075, output: 0.30 },
+  'gemini-3.1-pro': { input: 1.25, output: 5.00 },
+  'gemini-3.1-flash-lite': { input: 0.01, output: 0.04 },
+  // Anthropic (additional)
+  'claude-haiku-3-5': { input: 0.25, output: 1.25 },
 }
 
 function isRetryableError(err: unknown): boolean {

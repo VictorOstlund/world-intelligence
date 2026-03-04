@@ -1,0 +1,13 @@
+**Task wi-tbw.1 complete.** Summary of changes:
+
+**lib/pipeline.ts:**
+- `truncateToFirstReport()` — strips duplicate report blocks when LLM repeats output
+- `formatPubDate()` — readable UTC date formatting for article citations
+- Intra-run URL dedup via in-memory Set (before cross-run DB dedup)
+- Synthesis prompt: numbered sections (## 1. through ## 6.), domain-neutral analyst persona, [Source](url) citations, stop instruction, format compliance
+- Triage prompt: removed HY/credit framing, added pubDate to items
+
+**lib/llm.ts:**
+- 6 new model prices: gemini-3.1-flash-lite-preview, gemini-2.5-flash-lite, gemini-2.5-flash, gemini-3.1-pro, gemini-3.1-flash-lite, claude-haiku-3-5
+
+**Tests:** 138 passing (16 new), build clean. Next task: wi-5vd (PDF download + delete reports).

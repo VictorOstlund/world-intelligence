@@ -128,6 +128,11 @@ bash /home/node/.openclaw/workspace/scripts/run-auto-dev.sh \
 This runs: create-epic (epic + Task 1) → adaptive execute loop (implement → learn → create next → re-launch) → review.
 The manual steps below explain what each stage does.
 
+> **⚠️ Recovery rule — if a run was interrupted:**
+> Use `--resume` to recover. It skips already-complete stages and resumes the execute loop from where it left off (tracked in `plans/execute-completed-tasks.json`).
+> `--start-stage <stage>` is for intentionally skipping stages you know are already done — not for recovery. `--start-stage execute` restarts the loop from scratch.
+> Before resuming, verify open tasks: `npx bd ready --workspace /home/node/.openclaw/workspaces/{slug}`
+
 #### Step 1 — Get the spec
 
 The `--design` flag accepts any document that describes what to build or fix. Three valid sources:
@@ -239,6 +244,10 @@ bash /home/node/.openclaw/workspace/scripts/run-auto-dev-full.sh \
 ```
 This runs: create-epic → write-plan → sre-refine → codex-review → execute → review.
 The manual steps below explain what each stage does.
+
+> **⚠️ Recovery rule — if a run was interrupted:**
+> Use `--resume` to recover. `--start-stage <stage>` is for intentionally skipping stages you know are already done — not for recovery. Using `--start-stage execute` to recover will restart the loop from scratch and duplicate work.
+> Before resuming, verify open tasks with: `npx bd ready --workspace /home/node/.openclaw/workspaces/{slug}`
 
 Same brainstorm + design.md + epic creation as Mode 2 (Steps 1–3), then:
 

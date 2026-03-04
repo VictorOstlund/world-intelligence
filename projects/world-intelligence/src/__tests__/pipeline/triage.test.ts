@@ -196,7 +196,7 @@ describe('synthesizeReport', () => {
     expect(capturedPrompt).toContain('Coverage Gaps')
   })
 
-  it('synthesis prompt includes European high-yield credit analyst context', async () => {
+  it('synthesis prompt uses domain-neutral intelligence analyst persona', async () => {
     const { callLLM } = await import('../../../lib/llm')
     let capturedPrompt = ''
     vi.mocked(callLLM).mockImplementation(async (prompt: string) => {
@@ -206,8 +206,9 @@ describe('synthesizeReport', () => {
 
     await synthesizeReport(scoredItems, synthesisConfig)
 
-    expect(capturedPrompt.toLowerCase()).toContain('european')
-    expect(capturedPrompt.toLowerCase()).toContain('high-yield credit')
+    expect(capturedPrompt.toLowerCase()).toContain('intelligence analyst')
+    expect(capturedPrompt.toLowerCase()).not.toContain('high-yield')
+    expect(capturedPrompt.toLowerCase()).not.toContain('credit spread')
   })
 
   it('synthesis prompt requests report header with metadata', async () => {
@@ -215,16 +216,15 @@ describe('synthesizeReport', () => {
     let capturedPrompt = ''
     vi.mocked(callLLM).mockImplementation(async (prompt: string) => {
       capturedPrompt = prompt
-      return { text: '# Report\n\n## Executive Summary\nTest.', inputTokens: 100, outputTokens: 50 }
+      return { text: '# Report\n\n## 1. Executive Summary\nTest.', inputTokens: 100, outputTokens: 50 }
     })
 
     await synthesizeReport(scoredItems, synthesisConfig)
 
-    // Prompt should instruct model to include header metadata
-    expect(capturedPrompt.toLowerCase()).toMatch(/timestamp|date/)
+    // Prompt should include header metadata
+    expect(capturedPrompt).toMatch(/World Intelligence Report/)
     expect(capturedPrompt.toLowerCase()).toMatch(/categor/)
-    expect(capturedPrompt.toLowerCase()).toMatch(/sources?\s+count|number of sources|sources?\s+reviewed/)
-    expect(capturedPrompt.toLowerCase()).toMatch(/items?\s+reviewed|items?\s+count|number of items/)
+    expect(capturedPrompt.toLowerCase()).toMatch(/articles?\s+reviewed|items?\s+reviewed/)
   })
 })
 

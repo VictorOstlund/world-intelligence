@@ -92,6 +92,24 @@ export function createMockSql(store: Store) {
       return [{ n: store.reports.length }]
     }
 
+    // DELETE FROM reports WHERE id = $1 RETURNING id (must be before SELECT from reports)
+    if (q.includes('delete from reports') && q.includes('returning')) {
+      const id = (params as any[])[0]
+      const idx = store.reports.findIndex(r => r.id === id)
+      if (idx >= 0) {
+        const [removed] = store.reports.splice(idx, 1)
+        return [{ id: removed.id }]
+      }
+      return []
+    }
+
+    // DELETE FROM seen_articles WHERE report_id = $1 (must be before SELECT from seen_articles)
+    if (q.includes('delete from seen_articles') && q.includes('report_id')) {
+      const reportId = (params as any[])[0]
+      store.seen_articles = store.seen_articles.filter(a => a.report_id !== reportId)
+      return []
+    }
+
     // FTS search (search_vector / plainto_tsquery)
     if (q.includes('search_vector') || q.includes('plainto_tsquery')) {
       const searchTerm = String((params as any[])[0]).toLowerCase()

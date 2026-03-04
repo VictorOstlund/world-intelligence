@@ -259,6 +259,14 @@ export async function filterSeenUrls<T extends { url: string; importanceScore: n
   })
 }
 
+export async function deleteReport(id: string): Promise<boolean> {
+  // Delete associated seen_articles first (so URLs can be re-covered)
+  await query('DELETE FROM seen_articles WHERE report_id = $1', [id])
+  // Delete the report, returning the row to check if it existed
+  const rows = await query('DELETE FROM reports WHERE id = $1 RETURNING id', [id])
+  return rows.length > 0
+}
+
 export async function seedIfEmpty(): Promise<void> {
   const rows = await query('SELECT COUNT(*) as n FROM users')
   const count = Number(rows[0]?.n ?? 0)

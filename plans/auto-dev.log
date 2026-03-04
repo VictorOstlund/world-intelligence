@@ -67,3 +67,28 @@ Task **wi-41y** complete.
 - **Custom model handling** — saved values not in the dropdown list appear as a disabled "custom: [value]" option
 - **9 new tests**, 112 total passing, build clean
 - **Next task**: wi-54m — Article deduplication with seen_articles table (R5, last remaining epic criterion)
+
+════════════ STAGE: create-epic | 2026-03-04 16:28:29 UTC ════════════
+Done. The epic and Task 1 were already created with full design content from the design doc:
+
+- **Epic:** `wi-tbw` — "Feature: Polish v2 — report quality, UI overhaul, UX fixes" (all 6 required sections present)
+- **Task 1:** `wi-tbw.1` — "Task 1: Pipeline fixes — report repetition, intra-run dedup, source links, cost, prompt cleanup" (covers R1, R2, R3, R4, R8, R9)
+- **Link:** Task 1 is a child of the epic
+- **epic.json:** Updated to `{"epic_id": "wi-tbw", "task1_id": "wi-tbw.1", "slug": "world-intelligence"}`
+
+No code written — ready for execution.
+
+════════════ STAGE: execute-iter-1 | 2026-03-04 16:38:04 UTC ════════════
+**Task wi-tbw.1 complete.** Summary of changes:
+
+**lib/pipeline.ts:**
+- `truncateToFirstReport()` — strips duplicate report blocks when LLM repeats output
+- `formatPubDate()` — readable UTC date formatting for article citations
+- Intra-run URL dedup via in-memory Set (before cross-run DB dedup)
+- Synthesis prompt: numbered sections (## 1. through ## 6.), domain-neutral analyst persona, [Source](url) citations, stop instruction, format compliance
+- Triage prompt: removed HY/credit framing, added pubDate to items
+
+**lib/llm.ts:**
+- 6 new model prices: gemini-3.1-flash-lite-preview, gemini-2.5-flash-lite, gemini-2.5-flash, gemini-3.1-pro, gemini-3.1-flash-lite, claude-haiku-3-5
+
+**Tests:** 138 passing (16 new), build clean. Next task: wi-5vd (PDF download + delete reports).

@@ -1,4 +1,4 @@
-Read the design doc at /home/node/.openclaw/workspaces/world-intelligence/plans/2026-03-04-polish-v1-design.md.
+Read the design doc at /home/node/.openclaw/workspaces/world-intelligence/plans/2026-03-04-polish-v2-design.md.
 
 Create a bd epic and first task:
 

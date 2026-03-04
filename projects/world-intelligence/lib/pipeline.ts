@@ -23,6 +23,27 @@ function extractJson(text: string): unknown {
 }
 
 /**
+ * Truncate to first complete report if LLM repeats the report multiple times.
+ */
+function truncateToFirstReport(text: string): string {
+  const heading = '# World Intelligence Report'
+  const first = text.indexOf(heading)
+  if (first === -1) return text
+  const second = text.indexOf(heading, first + heading.length)
+  if (second === -1) return text
+  return text.slice(0, second).trim()
+}
+
+/**
+ * Format a pubDate string to a readable UTC format.
+ */
+function formatPubDate(raw: string): string {
+  const d = new Date(raw)
+  if (isNaN(d.getTime())) return raw || 'Unknown date'
+  return d.toUTCString().replace(' GMT', ' UTC')
+}
+
+/**
  * Triage a category: score items using cheap model, fetch full article for score >= 8.
  */
 export async function triageCategory(
@@ -40,7 +61,7 @@ Return ONLY a JSON array with objects: { url, relevanceScore, noveltyScore, impo
 No explanations, no markdown, just the JSON array.
 
 Items:
-${items.map(i => `- url: ${i.url}\n  title: ${i.title}\n  description: ${i.description}`).join('\n\n')}`
+${items.map(i => `- url: ${i.url}\n  title: ${i.title}\n  published: ${formatPubDate(i.pubDate)}\n  description: ${i.description}`).join('\n\n')}`
 
   let result
   try {
@@ -100,45 +121,47 @@ export async function synthesizeReport(
   const categories = [...new Set(scoredItems.map(i => i.category))].filter(Boolean)
   const contrarianItems = scoredItems.filter(i => i.contrarian_signal)
 
-  const prompt = `You are a world intelligence analyst writing for a European high-yield credit analyst.
+  const prompt = `You are a world intelligence analyst. Write a factual, analytical report.
 This report is used for daily briefings — it must be structured, factual, and actionable.
 
 Write a comprehensive markdown report covering today's most important global events using the pre-scored news items below.
 
 **Report header** (include at the top, before the first section):
-- Timestamp: ${new Date().toISOString().split('T')[0]}
-- Categories covered: ${categories.join(', ')} (${categories.length} total)
-- Sources count: ${scoredItems.length} items reviewed
+# World Intelligence Report — ${new Date().toISOString().split('T')[0]}
+**Categories covered:** ${categories.join(', ')} (${categories.length} total) | **Articles reviewed:** ${scoredItems.length} items
 
-**Required sections — use these exact ## headings:**
+**You MUST include all 6 sections in exactly this order. Use these exact numbered ## headings:**
 
-## Executive Summary
+## 1. Executive Summary
 3-5 sentences synthesizing the most significant developments across all categories.
 
-## Key Themes & Patterns
+## 2. Key Themes & Patterns
 Cross-category synthesis — identify threads connecting events across different categories. Not just per-category recap.
 
-## Critical Events
-Priority-flagged events. Mark each as **HIGH** or **MEDIUM** priority. Include source URL.
+## 3. Critical Events
+Priority-flagged events. Mark each as **HIGH** or **MEDIUM** priority. For every article you reference, include a [Source](url) citation with the actual article URL.
 
-## Opportunities
-Market angles — HY credit implications, macro positioning, spread implications. Be specific about which sectors/issuers.
+## 4. Opportunities
+Forward-looking observations — emerging trends, strategic implications, sectors to watch. Be specific.
 
-## Contrarian Angles
+## 5. Contrarian Angles
 What major outlets are underweighting or missing entirely.${contrarianItems.length > 0 ? `\nItems flagged as contrarian by triage: ${contrarianItems.map(i => `"${i.title}"`).join(', ')}` : ''}
 
-## Coverage Gaps
+## 6. Coverage Gaps
 Topics that should have news but don't — notable silences. What's NOT being covered that matters.
+
+Write the complete report exactly once. After ## 6. Coverage Gaps, stop. Do not repeat, summarise, or re-state content after the final section.
 
 **Source items:**
 ${scoredItems.map(i =>
-  `### ${i.title} [${i.category}]${i.contrarian_signal ? ' 🔄 CONTRARIAN' : ''}\nURL: ${i.url}\nImportance: ${i.importanceScore}/10\n${i.fullText || i.description}`
+  `### ${i.title} [${i.category}]${i.contrarian_signal ? ' 🔄 CONTRARIAN' : ''}\nURL: ${i.url}\nPublished: ${formatPubDate(i.pubDate)}\nImportance: ${i.importanceScore}/10\n${i.fullText || i.description}`
 ).join('\n\n')}
 
+For every article you reference, include a [Source](url) citation with the actual article URL.
 Keep it factual and analytical. Every claim must be traceable to a source item.`
 
   const result = await callLLM(prompt, config)
-  const body = result.text
+  const body = truncateToFirstReport(result.text)
 
   // Extract summary from ## Executive Summary / ## Summary section, or first paragraph
   let summary = ''
@@ -244,8 +267,16 @@ export async function runPipeline(): Promise<PipelineResult> {
 
   const allScoredItems = categoryResults.flat()
 
-  // Dedup: filter out articles already seen in previous reports
-  const dedupedItems = await filterSeenUrls(allScoredItems)
+  // Intra-run URL dedup: remove duplicate URLs within this single run (no DB side effects)
+  const seenUrls = new Set<string>()
+  const uniqueItems = allScoredItems.filter(item => {
+    if (!item.url || seenUrls.has(item.url)) return false
+    seenUrls.add(item.url)
+    return true
+  })
+
+  // Cross-run dedup: filter out articles already seen in previous reports
+  const dedupedItems = await filterSeenUrls(uniqueItems)
 
   const itemCount = dedupedItems.length
   const sourceCount = enabledCategories.length

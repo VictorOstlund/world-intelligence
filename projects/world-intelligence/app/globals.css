@@ -1,27 +1,99 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
+/* Dark theme (default) */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --wi-bg: #0f1117;
+  --wi-surface: #1a1d27;
+  --wi-border: #2d3148;
+  --wi-text: #e8eaf6;
+  --wi-text-secondary: #8892b0;
+  --wi-accent: #4f8ef7;
+  --wi-success: #22c55e;
+  --wi-danger: #ef4444;
+  --wi-input-bg: #1a1d27;
+}
+
+/* Light theme */
+[data-theme="light"] {
+  --wi-bg: #f8f9fc;
+  --wi-surface: #ffffff;
+  --wi-border: #e2e4ea;
+  --wi-text: #1a1d27;
+  --wi-text-secondary: #5a6178;
+  --wi-accent: #4f8ef7;
+  --wi-success: #16a34a;
+  --wi-danger: #dc2626;
+  --wi-input-bg: #ffffff;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-wi-bg: var(--wi-bg);
+  --color-wi-surface: var(--wi-surface);
+  --color-wi-border: var(--wi-border);
+  --color-wi-text: var(--wi-text);
+  --color-wi-secondary: var(--wi-text-secondary);
+  --color-wi-accent: var(--wi-accent);
+  --color-wi-success: var(--wi-success);
+  --color-wi-danger: var(--wi-danger);
+  --color-wi-input: var(--wi-input-bg);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+body {
+  background: var(--wi-bg);
+  color: var(--wi-text);
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* Print styles */
+@media print {
+  header, nav, .no-print {
+    display: none !important;
+  }
+
+  body {
+    background: white !important;
+    color: black !important;
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 11pt;
+    line-height: 1.6;
+  }
+
+  main {
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  @page {
+    margin: 2cm;
+    size: A4;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
+  h3, h4 {
+    break-before: avoid;
+    page-break-before: avoid;
+  }
+
+  .prose {
+    max-width: 100% !important;
+    color: black !important;
+  }
+
+  .prose a {
+    color: black !important;
+    text-decoration: underline !important;
+  }
+
+  .prose, [class*="bg-"] {
+    background: transparent !important;
+    border-color: #ccc !important;
+  }
 }

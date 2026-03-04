@@ -1,0 +1,9 @@
+**Done.** Task wi-54m (Article deduplication) completed. Epic wi-eeg (Polish v1) is fully done.
+
+**What was done:**
+- DB functions (`markArticlesSeen`, `filterSeenUrls`) and pipeline wiring were already in place from a prior iteration
+- Added 2 pipeline-level integration tests:
+  1. Second pipeline run deduplicates previously seen articles (itemCount drops to 0)
+  2. Items with `importanceScore >= 9` bypass dedup even if URL was seen before
+- **122 tests pass**, build clean
+- All 5 epic requirements (R1–R5) implemented and verified

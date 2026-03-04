@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
@@ -39,9 +39,11 @@ function parseCategories(raw: string): string[] {
 
 export default function ReportPage() {
   const { id } = useParams<{ id: string }>()
+  const router = useRouter()
   const [report, setReport] = useState<Report | null>(null)
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     fetch(`/api/reports/${id}`)
@@ -60,64 +62,114 @@ export default function ReportPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex items-center justify-center">
-        <p className="text-zinc-500 text-sm">Loading...</p>
+      <div className="flex items-center justify-center py-20">
+        <div className="flex items-center gap-3 text-wi-secondary text-sm">
+          <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+          Loading...
+        </div>
       </div>
     )
   }
 
   if (notFound || !report) {
     return (
-      <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-zinc-500 text-sm mb-4">Report not found.</p>
-          <Link href="/reports" className="text-sm underline text-zinc-600 dark:text-zinc-400">Back to Reports</Link>
-        </div>
+      <div className="flex flex-col items-center justify-center py-20 text-center">
+        <p className="text-wi-secondary text-sm mb-4">Report not found.</p>
+        <Link href="/reports" className="text-sm text-wi-accent hover:underline">Back to Reports</Link>
       </div>
     )
+  }
+
+  async function handleDelete() {
+    if (!confirm('Are you sure you want to delete this report? This cannot be undone.')) return
+    setDeleting(true)
+    try {
+      const res = await fetch(`/api/reports/${id}`, { method: 'DELETE' })
+      if (res.ok || res.status === 204) {
+        router.push('/reports')
+      }
+    } finally {
+      setDeleting(false)
+    }
   }
 
   const cats = parseCategories(report.categories)
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100">
-      <header className="border-b border-zinc-200 dark:border-zinc-800 px-6 py-4 flex items-center justify-between">
-        <Link href="/reports" className="text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100">
-          ← Back to Reports
-        </Link>
-        <nav className="flex gap-4 text-sm">
-          <Link href="/reports" className="text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100">Reports</Link>
-          <Link href="/settings" className="text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100">Settings</Link>
-        </nav>
-      </header>
-
-      <main className="max-w-3xl mx-auto px-6 py-8">
-        <div className="mb-6">
-          <p className="text-sm text-zinc-500 mb-1">{formatDate(report.created_at)}</p>
-          <div className="flex flex-wrap gap-2 text-xs text-zinc-400 mb-3">
-            <span>Triage: {report.triage_model}</span>
-            <span>·</span>
-            <span>Synthesis: {report.synthesis_model}</span>
-            <span>·</span>
-            <span>Cost: ${report.cost_usd.toFixed(4)}</span>
-            <span>·</span>
-            <span>{report.item_count} items from {report.source_count} categories</span>
+    <>
+      {/* Sticky action bar */}
+      <div className="no-print sticky top-14 z-40 border-b border-wi-border bg-wi-surface/80 backdrop-blur-sm">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 h-12 flex items-center justify-between">
+          <Link
+            href="/reports"
+            className="flex items-center gap-1.5 text-sm text-wi-secondary hover:text-wi-text transition-colors"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="15 18 9 12 15 6"/>
+            </svg>
+            Reports
+          </Link>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => window.print()}
+              className="px-3 py-1.5 text-xs font-medium border border-wi-border rounded-lg text-wi-secondary hover:text-wi-text hover:bg-wi-border/30 transition-colors"
+            >
+              Download PDF
+            </button>
+            <button
+              onClick={handleDelete}
+              disabled={deleting}
+              className="px-3 py-1.5 text-xs font-medium border border-wi-danger/30 text-wi-danger rounded-lg hover:bg-wi-danger/10 transition-colors disabled:opacity-50"
+            >
+              {deleting ? 'Deleting...' : 'Delete'}
+            </button>
           </div>
-          <div className="flex flex-wrap gap-1">
+        </div>
+      </div>
+
+      <main className="max-w-3xl mx-auto px-4 sm:px-6 py-8">
+        {/* Metadata bar */}
+        <div className="mb-6 pb-6 border-b border-wi-border">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-wi-secondary mb-3">
+            <span>{formatDate(report.created_at)}</span>
+            <span className="hidden sm:inline">|</span>
+            <span className="text-wi-success font-medium">${report.cost_usd.toFixed(4)}</span>
+            <span className="hidden sm:inline">|</span>
+            <span>{report.item_count} items from {report.source_count} categories</span>
+            <span className="hidden sm:inline">|</span>
+            <span>Triage: {report.triage_model}</span>
+            <span className="hidden sm:inline">|</span>
+            <span>Synthesis: {report.synthesis_model}</span>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
             {cats.map(cat => (
-              <span key={cat} className="text-xs px-1.5 py-0.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 rounded">
+              <span key={cat} className="text-[11px] px-2 py-0.5 bg-wi-accent/10 text-wi-accent rounded-full">
                 {cat}
               </span>
             ))}
           </div>
         </div>
 
-        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg p-6 prose prose-zinc dark:prose-invert prose-sm max-w-none">
+        {/* Report body */}
+        <article className="prose prose-sm max-w-none
+          prose-headings:text-wi-text prose-headings:font-semibold
+          prose-p:text-wi-text prose-p:leading-relaxed
+          prose-a:text-wi-accent prose-a:no-underline hover:prose-a:underline
+          prose-strong:text-wi-text
+          prose-li:text-wi-text
+          prose-code:text-wi-accent prose-code:bg-wi-surface prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-xs
+          prose-pre:bg-wi-surface prose-pre:border prose-pre:border-wi-border prose-pre:rounded-lg
+          prose-blockquote:border-wi-accent prose-blockquote:text-wi-secondary
+          prose-table:text-wi-text
+          prose-th:text-wi-text prose-th:border-wi-border
+          prose-td:border-wi-border
+          prose-hr:border-wi-border
+        ">
           <ReactMarkdown remarkPlugins={[remarkGfm]}>
             {report.body}
           </ReactMarkdown>
-        </div>
+        </article>
       </main>
-    </div>
+    </>
   )
 }
