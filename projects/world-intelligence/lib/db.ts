@@ -17,24 +17,30 @@ function getSql(): SqlFunction {
 
 let _initialized = false
 
-/** Use sql.query() for parameterised queries (neon v1+ API) */
+/** Raw query — no auto-init, used by initDb itself */
+async function rawQuery(sqlStr: string, params?: unknown[]): Promise<Record<string, unknown>[]> {
+  return (getSql() as any).query(sqlStr, params ?? []) as Promise<Record<string, unknown>[]>
+}
+
+/** Use sql.query() for parameterised queries — auto-inits schema on first call */
 async function query(sqlStr: string, params?: unknown[]): Promise<Record<string, unknown>[]> {
   if (!_initialized) {
     await initDb()
     _initialized = true
   }
-  return (getSql() as any).query(sqlStr, params ?? []) as Promise<Record<string, unknown>[]>
+  return rawQuery(sqlStr, params)
 }
 
 export async function initDb(): Promise<void> {
-  await query(`CREATE TABLE IF NOT EXISTS users (
+  // Uses rawQuery to avoid circular call from query() auto-init
+  await rawQuery(`CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY,
     username TEXT UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
     created_at BIGINT NOT NULL
   )`)
 
-  await query(`CREATE TABLE IF NOT EXISTS config (
+  await rawQuery(`CREATE TABLE IF NOT EXISTS config (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     active_provider TEXT NOT NULL DEFAULT 'anthropic',
     triage_model TEXT NOT NULL DEFAULT 'gemini-1.5-flash-8b',
@@ -46,7 +52,7 @@ export async function initDb(): Promise<void> {
     providers TEXT NOT NULL DEFAULT '{}'
   )`)
 
-  await query(`CREATE TABLE IF NOT EXISTS reports (
+  await rawQuery(`CREATE TABLE IF NOT EXISTS reports (
     id TEXT PRIMARY KEY,
     created_at BIGINT NOT NULL,
     schedule TEXT NOT NULL,
@@ -61,9 +67,9 @@ export async function initDb(): Promise<void> {
     search_vector tsvector
   )`)
 
-  await query(`CREATE INDEX IF NOT EXISTS reports_fts_idx ON reports USING GIN(search_vector)`)
+  await rawQuery(`CREATE INDEX IF NOT EXISTS reports_fts_idx ON reports USING GIN(search_vector)`)
 
-  await query(`
+  await rawQuery(`
     CREATE OR REPLACE FUNCTION reports_search_vector_update() RETURNS trigger AS $$
     BEGIN
       NEW.search_vector := to_tsvector('english', coalesce(NEW.body,'') || ' ' || coalesce(NEW.summary,''));
@@ -72,8 +78,8 @@ export async function initDb(): Promise<void> {
     $$ LANGUAGE plpgsql
   `)
 
-  await query(`DROP TRIGGER IF EXISTS reports_search_vector_trigger ON reports`)
-  await query(`CREATE TRIGGER reports_search_vector_trigger BEFORE INSERT OR UPDATE ON reports FOR EACH ROW EXECUTE FUNCTION reports_search_vector_update()`)
+  await rawQuery(`DROP TRIGGER IF EXISTS reports_search_vector_trigger ON reports`)
+  await rawQuery(`CREATE TRIGGER reports_search_vector_trigger BEFORE INSERT OR UPDATE ON reports FOR EACH ROW EXECUTE FUNCTION reports_search_vector_update()`)
 }
 
 export async function getUser(username: string): Promise<{ id: string; username: string; password_hash: string; created_at: number } | undefined> {
