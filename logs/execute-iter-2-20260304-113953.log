@@ -1,0 +1,13 @@
+Task 2 complete. Here's the summary:
+
+**Task wi-qye done** — RSS feed loader from worldmonitor GitHub + per-category fetcher
+
+**What was implemented:**
+- `lib/feeds.ts`: `parseRssFeed()` (pure, handles RSS 2.0 + Atom), `fetchCategory()` (parallel multi-feed fetch + dedup), `fetchFullArticle()` (plain text for score ≥8 items), `loadFeedList()` (tries GitHub, falls back to hardcoded feeds for all 15 categories, 1h TTL cache)
+- `lib/categories.ts`: `DEFAULT_CATEGORIES` (15 categories: geopolitics, economics, technology, climate, energy, defense, finance, health, science, society, media, conflict, trade, infrastructure, emerging-markets), `getCategoryConfig()` (merges DB overrides with defaults, handles JSON strings from SQLite)
+- `lib/db.ts`: Added `getActiveCategoryConfig()` helper
+- 24 new tests (parser + categories), 37 total passing
+
+**Key discovery:** worldmonitor's GitHub repo (github.com/worldmonitor/worldmonitor) returns 404 — the fallback to hardcoded public RSS feeds is essential, not optional.
+
+**Next task:** wi-ahc — Two-tier pipeline (triage agent, synthesis, scheduler, cost tracking)

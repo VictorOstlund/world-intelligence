@@ -1,0 +1,172 @@
+## Goal
+Scaffold the A2 standalone Next.js 15 project with TypeScript, initialize SQLite schema (reports, config, users tables), and implement the auth system (bcrypt password hashing, JWT via jose, httpOnly cookie sessions). This is the foundation everything else builds on — no LLM calls, no RSS fetching, no pipeline yet.
+
+## Implementation
+
+### TDD Steps
+
+**RED — Write failing tests first:**
+1. `src/__tests__/db/schema.test.ts` — assert tables exist with correct columns
+2. `src/__tests__/auth/hash.test.ts` — assert bcrypt round-trip, assert JWT sign/verify
+3. `src/__tests__/api/auth.test.ts` — assert POST /api/auth/login returns 200 + cookie on valid creds, 401 on invalid
+
+**GREEN — Implement minimally:**
+Run `npx create-next-app@latest . --typescript --tailwind --app --no-src-dir --import-alias "@/*"` in `projects/world-intelligence/`.
+
+### Exact File Paths and Changes
+
+**`projects/world-intelligence/`** — project root
+
+**`package.json`** additions:
+```
+"better-sqlite3": "^11",
+"@types/better-sqlite3": "^7",
+"bcryptjs": "^2",
+"@types/bcryptjs": "^2",
+"jose": "^5",
+"node-cron": "^3",
+"fast-xml-parser": "^4",
+"@google/generative-ai": "^0.21",
+"@anthropic-ai/sdk": "^0.39",
+"openai": "^4",
+"uuid": "^11",
+"@types/uuid": "^10",
+"vitest": "^2",
+"@vitejs/plugin-react": "^4"
+```
+
+**`lib/db.ts`** — singleton SQLite connection:
+- Opens `DATA_DIR/world-intelligence.db` (from `process.env.DATA_DIR || './data'`)
+- Runs schema migration on startup (CREATE TABLE IF NOT EXISTS)
+- Exports `db` singleton
+
+**`lib/schema.sql`** (inline in `lib/db.ts` as string, executed via `db.exec()`):
+```sql
+CREATE TABLE IF NOT EXISTS reports (
+  id TEXT PRIMARY KEY,
+  created_at INTEGER NOT NULL,
+  schedule TEXT NOT NULL,
+  categories TEXT NOT NULL,  -- JSON array
+  summary TEXT NOT NULL,
+  body TEXT NOT NULL,
+  cost_usd REAL NOT NULL DEFAULT 0,
+  triage_model TEXT NOT NULL,
+  synthesis_model TEXT NOT NULL,
+  item_count INTEGER NOT NULL DEFAULT 0,
+  source_count INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS config (
+  id INTEGER PRIMARY KEY CHECK (id = 1),  -- single row enforced
+  active_provider TEXT NOT NULL DEFAULT 'anthropic',
+  triage_model TEXT NOT NULL DEFAULT 'gemini-1.5-flash-8b',
+  synthesis_model TEXT NOT NULL DEFAULT 'claude-sonnet-4-6',
+  triage_fallbacks TEXT NOT NULL DEFAULT '[]',   -- JSON array, max 2
+  synthesis_fallbacks TEXT NOT NULL DEFAULT '[]', -- JSON array, max 2
+  schedule_hours INTEGER NOT NULL DEFAULT 6,
+  category_config TEXT NOT NULL DEFAULT '{}',    -- JSON object: {[cat]: {enabled, itemBudget}}
+  providers TEXT NOT NULL DEFAULT '{}'           -- JSON: never returned to client
+);
+
+CREATE TABLE IF NOT EXISTS users (
+  id TEXT PRIMARY KEY,
+  username TEXT UNIQUE NOT NULL,
+  password_hash TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);
+
+CREATE VIRTUAL TABLE IF NOT EXISTS reports_fts USING fts5(
+  id UNINDEXED,
+  body,
+  summary,
+  content='reports',
+  content_rowid='rowid'
+);
+```
+
+**`lib/auth.ts`**:
+- `hashPassword(plain: string): Promise<string>` — bcryptjs, 12 rounds
+- `verifyPassword(plain: string, hash: string): Promise<boolean>`
+- `signJwt(payload: { userId: string, username: string }): Promise<string>` — uses `process.env.JWT_SECRET`, 7d expiry
+- `verifyJwt(token: string): Promise<{ userId: string, username: string } | null>`
+- `getSession(req: Request): Promise<{ userId: string, username: string } | null>` — reads `session` httpOnly cookie
+
+**`app/api/auth/login/route.ts`**:
+- POST — accepts `{ username, password }`
+- Looks up user in SQLite by username
+- Verifies bcrypt hash
+- On success: signs JWT, sets httpOnly cookie `session`, returns `{ ok: true }`
+- On failure: returns 401 `{ error: 'invalid credentials' }`
+- Never returns password hash or any credential
+
+**`app/api/auth/logout/route.ts`**:
+- POST — clears `session` cookie, returns 200
+
+**`app/api/auth/me/route.ts`**:
+- GET — returns `{ username }` if session valid, 401 if not
+
+**`middleware.ts`** (Next.js edge middleware):
+- Protects all routes except `/login` and `/api/auth/*`
+- Reads `session` cookie, verifies JWT
+- Redirects to `/login` if invalid
+
+**`.env.example`**:
+```
+JWT_SECRET=change-me-minimum-32-chars
+DATA_DIR=./data
+INITIAL_ADMIN_USERNAME=admin
+INITIAL_ADMIN_PASSWORD=changeme
+# LLM providers (fill what you have)
+ANTHROPIC_API_KEY=
+OPENAI_API_KEY=
+AZURE_OPENAI_API_KEY=
+AZURE_OPENAI_ENDPOINT=
+AZURE_OPENAI_DEPLOYMENT=
+GEMINI_API_KEY=
+FRED_API_KEY=
+```
+
+**`lib/seed.ts`** — run once on startup if users table is empty:
+- Creates initial admin from `INITIAL_ADMIN_USERNAME` / `INITIAL_ADMIN_PASSWORD`
+- Called from `lib/db.ts` after schema migration
+
+**`app/login/page.tsx`** — minimal login form:
+- POST to `/api/auth/login`
+- Shows error on 401
+- Redirects to `/` on success
+
+**`vitest.config.ts`**:
+```ts
+import { defineConfig } from 'vitest/config'
+export default defineConfig({
+  test: { environment: 'node', globals: true }
+})
+```
+
+**`package.json` scripts**:
+```json
+"test": "vitest run",
+"test:watch": "vitest",
+"dev": "next dev",
+"build": "next build",
+"start": "node scripts/start.js"
+```
+
+**`scripts/start.js`** — production startup:
+- Runs schema migration + seed
+- Starts Next.js production server (`next start`)
+- Starts node-cron scheduler (stub for now — actual pipeline in later task)
+
+### REFACTOR
+- Extract `db.ts` helper: `getConfig()`, `saveConfig()`, `getUser(username)`, `createUser()`
+- Ensure no secrets leak: audit all API routes that they return only safe fields
+
+## Success Criteria
+- [ ] `npm test` passes with all 3 test suites green
+- [ ] `npm run dev` starts without errors
+- [ ] SQLite file created at `DATA_DIR` on startup with correct schema
+- [ ] POST `/api/auth/login` with correct credentials returns 200 + httpOnly `session` cookie
+- [ ] POST `/api/auth/login` with wrong credentials returns 401
+- [ ] All non-auth routes return 401 when no session cookie
+- [ ] Password hash not present in any API response
+- [ ] `.env.example` documents all env vars

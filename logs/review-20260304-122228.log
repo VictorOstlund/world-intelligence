@@ -1,0 +1,7 @@
+Review complete. **1 gap found and fixed**:
+
+- **Gap**: `middleware.test.ts:41` used `{ sub: 'user-123' }` as the mock return value for `verifyJwt`, but the function's return type is `{ userId: string; username: string } | null`. TypeScript reported `TS2353`.
+- **Fix**: Changed mock to `{ userId: 'user-123', username: 'testuser' }`.
+- **Verification**: TypeScript clean, 82/82 tests pass.
+
+All epic success criteria verified with evidence. No anti-patterns violated. `plans/stage_summary.json` written: `{"stage": "review", "summary": "gaps-fixed", "gaps_found": 1, "gaps_fixed": 1}`.

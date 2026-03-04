@@ -1,0 +1,11 @@
+**wi-lr9 complete. Epic done.**
+
+All 82 tests passing. Task 6 added:
+
+1. **Non-retryable error test** (`llm.test.ts`): 400 errors are NOT retried — `mockCreate` called exactly once, no fallback advance
+2. **Auth middleware tests** (`middleware.test.ts`, 4 tests): no-cookie → 307 redirect; `/api/auth/*` → pass-through; valid JWT → pass-through; invalid JWT → 307 redirect
+3. **5-category smoke test** (`pipeline.test.ts`): enables 5 categories via `saveConfig`, verifies ≥5 `fetchCategory` calls and `itemCount > 0`
+
+Key fix: URL in `fetchCategory` mock must match the URL in `triagedJson` (`https://example.com/1`) so the triage score lookup hits correctly.
+
+Iteration result: `{"done": true}` — epic complete.

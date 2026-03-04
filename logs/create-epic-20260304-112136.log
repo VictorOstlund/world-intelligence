@@ -1,0 +1,10 @@
+Done. Here's the summary:
+
+| | ID | Title |
+|---|---|---|
+| **Epic** | `wi-uhh` | Feature: world-intelligence |
+| **Task 1** | `wi-6ly` | Task 1: Project scaffold, SQLite schema, and auth |
+
+**`plans/epic.json`** saved with both IDs.
+
+**Task 1 scope:** Next.js 15 + TypeScript scaffold, SQLite schema (reports/config/users + FTS5), auth system (bcrypt + jose JWT + httpOnly cookie), middleware protection, seed admin user on startup. TDD-first with 3 test suites before any implementation. No pipeline or LLM calls yet — pure foundation.

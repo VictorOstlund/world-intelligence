@@ -1,0 +1,15 @@
+Task **wi-6vo** complete. Here's a summary of what was done:
+
+**Delivered:**
+1. **`scripts/a1-orchestrator.ts`** — OpenClaw-native cron target. Calls `runPipeline()`, writes the markdown report to `/home/node/.openclaw/workspace/reports/<date>-<id>.md`, and appends outcome to the workspace memory log.
+
+2. **`instrumentation.ts`** updated — `seedIfEmpty()` is now called eagerly on server startup (not lazily on first DB request).
+
+3. **`.env.example`** — Added `SCHEDULE_HOURS=6` with documentation.
+
+4. **3 smoke tests** in `src/__tests__/api/pipeline.test.ts`:
+   - `POST /api/pipeline/run` with mocked LLM → saves report to DB → 200 + reportId returned
+   - Saved report appears in `GET /api/reports`
+   - Disabled categories produce no `fetchCategory` calls
+
+**All 76 tests pass.** Next task: **wi-lr9** — fallback chain test, auth middleware test, and ≥5-category multi-category validation.

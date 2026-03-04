@@ -1,0 +1,10 @@
+**Task 3 complete.** Here's what was done:
+
+**Implemented:**
+- `lib/pipeline.ts` — `triageCategory()` (scores items via LLM, fetches full article for importance ≥ 8) + `synthesizeReport()` (markdown report with body/summary/cost)
+- `lib/scheduler.ts` — `startScheduler()` / `stopScheduler()` singleton wrapping node-cron
+- `lib/db.ts` additions — `saveReport`, `getReport`, `getReports` (paginated, newest-first), `searchReports` (FTS5), and `Report` interface
+
+**Test result:** 62/62 passing (up from 48)
+
+**Next task (wi-axr):** Task 4 — API routes (`/api/reports`, `/api/settings`, `/api/pipeline/run`), frontend UI (reports browser/viewer, settings panel), and `npm start` scheduler wiring

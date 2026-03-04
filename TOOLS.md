@@ -34,7 +34,7 @@ Before reaching for any implementation tool, answer one question:
 
 ## What "Claude Code CLI" Means
 
-**Claude Code CLI** = the `claude` binary at `~/.local/bin/claude`
+**Claude Code CLI** = the `claude` binary at `/home/node/.local/bin/claude`
 
 It is a full autonomous coding agent that reads/writes files, runs shell commands and tests, fixes bugs it introduces, and iterates until the task is done. It is NOT an API call to Claude, not a model you're chatting with, not something that just gives advice.
 
@@ -42,13 +42,13 @@ It is a full autonomous coding agent that reads/writes files, runs shell command
 ```bash
 # Sonnet (default):
 CLAUDE_CONFIG_DIR=/home/node/.openclaw/.claude-auth \
-  ~/.local/bin/claude \
+  /home/node/.local/bin/claude \
   --dangerously-skip-permissions \
   --print "your task here"
 
 # Opus (for complex work):
 CLAUDE_CONFIG_DIR=/home/node/.openclaw/.claude-auth \
-  ~/.local/bin/claude \
+  /home/node/.local/bin/claude \
   --dangerously-skip-permissions \
   --model claude-opus-4-6 \
   --print "your task here"
@@ -91,13 +91,13 @@ cd /home/node/.openclaw/workspaces/{your-slug}/projects
 
 # Claude Code CLI (Sonnet):
 CLAUDE_CONFIG_DIR=/home/node/.openclaw/.claude-auth \
-  ~/.local/bin/claude \
+  /home/node/.local/bin/claude \
   --dangerously-skip-permissions \
   --print "your task description here"
 
 # Claude Code CLI (Opus for complex work):
 CLAUDE_CONFIG_DIR=/home/node/.openclaw/.claude-auth \
-  ~/.local/bin/claude \
+  /home/node/.local/bin/claude \
   --dangerously-skip-permissions \
   --model claude-opus-4-6 \
   --print "your task description here"
@@ -166,7 +166,7 @@ The script handles this automatically. If running manually, Claude Code reads th
 
 ```bash
 CLAUDE_CONFIG_DIR=/home/node/.openclaw/.claude-auth \
-  ~/.local/bin/claude \
+  /home/node/.local/bin/claude \
   --dangerously-skip-permissions \
   --print "Read the design doc at /home/node/.openclaw/workspaces/{slug}/plans/{design-file}.md.
 
@@ -208,7 +208,7 @@ Learnings accumulate in `plans/learnings.md` across iterations — each call rea
 
 ```bash
 CLAUDE_CONFIG_DIR=/home/node/.openclaw/.claude-auth \
-  ~/.local/bin/claude \
+  /home/node/.local/bin/claude \
   --dangerously-skip-permissions \
   --print "Read /home/node/.openclaw/workspaces/{slug}/plans/epic.json to get the epic ID.
 Run: npx bd show <epic_id>
@@ -248,7 +248,7 @@ Same brainstorm + design.md + epic creation as Mode 2 (Steps 1–3), then:
 
 ```bash
 CLAUDE_CONFIG_DIR=/home/node/.openclaw/.claude-auth \
-  ~/.local/bin/claude \
+  /home/node/.local/bin/claude \
   --dangerously-skip-permissions \
   --print "Read /home/node/.openclaw/workspaces/{slug}/plans/epic.json to get the epic ID.
 Run: npx bd show <epic_id> to load the epic.
@@ -266,7 +266,7 @@ Run BEFORE Codex review so Codex sees the hardened plan:
 
 ```bash
 CLAUDE_CONFIG_DIR=/home/node/.openclaw/.claude-auth \
-  ~/.local/bin/claude \
+  /home/node/.local/bin/claude \
   --dangerously-skip-permissions \
   --print "Read /home/node/.openclaw/workspaces/{slug}/plans/epic.json.
 Load each task via: npx bd show <task_id>
@@ -351,7 +351,7 @@ Codex has the same skills installed at `~/.agents/skills/` but has no hook syste
 
 ```bash
 CLAUDE_CONFIG_DIR=/home/node/.openclaw/.claude-auth \
-  ~/.local/bin/claude \
+  /home/node/.local/bin/claude \
   --dangerously-skip-permissions \
   --print "Read /home/node/.openclaw/workspaces/{slug}/plans/epic.json to get the epic ID.
 Run: npx bd show <epic_id> to load the epic requirements.
@@ -374,7 +374,7 @@ Use the HyperPowers write-plan skill to expand the full epic into ALL tasks upfr
 
 ```bash
 CLAUDE_CONFIG_DIR=/home/node/.openclaw/.claude-auth \
-  ~/.local/bin/claude \
+  /home/node/.local/bin/claude \
   --dangerously-skip-permissions \
   --print "Read /home/node/.openclaw/workspaces/{slug}/plans/epic.json to get all task IDs.
 Load each task: npx bd show <task_id>
@@ -394,7 +394,7 @@ Use the HyperPowers sre-task-refinement skill to refine every bd task:
 
 ```bash
 CLAUDE_CONFIG_DIR=/home/node/.openclaw/.claude-auth \
-  ~/.local/bin/claude \
+  /home/node/.local/bin/claude \
   --dangerously-skip-permissions \
   --print "Read /home/node/.openclaw/workspaces/{slug}/plans/epic.json to get the epic ID.
 Run: npx bd show <epic_id> to load the full epic.
