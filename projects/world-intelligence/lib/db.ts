@@ -15,8 +15,14 @@ function getSql(): SqlFunction {
   return _sql
 }
 
+let _initialized = false
+
 /** Use sql.query() for parameterised queries (neon v1+ API) */
 async function query(sqlStr: string, params?: unknown[]): Promise<Record<string, unknown>[]> {
+  if (!_initialized) {
+    await initDb()
+    _initialized = true
+  }
   return (getSql() as any).query(sqlStr, params ?? []) as Promise<Record<string, unknown>[]>
 }
 
