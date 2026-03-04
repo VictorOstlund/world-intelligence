@@ -242,6 +242,13 @@ export default function SettingsPage() {
     )
   }
 
+  function isProviderConfigured(provider: string): boolean {
+    const entry = config.providers?.[provider]
+    const hasKey = savedKeys[provider] || (!!entry?.apiKey && entry.apiKey !== '')
+    if (provider === 'azure') return hasKey && !!entry?.baseURL && entry.baseURL !== ''
+    return hasKey
+  }
+
   const triageFallbacks = parseFallbacks(config.triage_fallbacks)
   const synthFallbacks = parseFallbacks(config.synthesis_fallbacks)
 
@@ -258,7 +265,14 @@ export default function SettingsPage() {
             onChange={e => handleProviderChange(e.target.value)}
             className="w-full px-3 py-2 text-sm border border-wi-border rounded-lg bg-wi-input text-wi-text focus:outline-none focus:ring-2 focus:ring-wi-accent/40 focus:border-wi-accent transition-colors"
           >
-            {PROVIDERS.map(p => <option key={p} value={p}>{p}</option>)}
+            {PROVIDERS.map(p => {
+              const configured = isProviderConfigured(p)
+              return (
+                <option key={p} value={p} style={configured ? undefined : { color: '#9ca3af' }}>
+                  {p}{configured ? '' : ' (no key)'}
+                </option>
+              )
+            })}
           </select>
 
           <div className="mt-4 space-y-3">
