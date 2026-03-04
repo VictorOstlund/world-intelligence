@@ -261,14 +261,16 @@ export default function SettingsPage() {
           <SectionHeader title="Provider" />
           <label className="block text-xs text-wi-secondary mb-1.5">Active provider</label>
           <select
-            value={config.active_provider || 'anthropic'}
-            onChange={e => handleProviderChange(e.target.value)}
+            value={config.active_provider || ''}
+            onChange={e => { if (e.target.value) handleProviderChange(e.target.value) }}
             className="w-full px-3 py-2 text-sm border border-wi-border rounded-lg bg-wi-input text-wi-text focus:outline-none focus:ring-2 focus:ring-wi-accent/40 focus:border-wi-accent transition-colors"
           >
+            <option value="">— Select provider —</option>
             {PROVIDERS.map(p => {
               const configured = isProviderConfigured(p)
+              const isActive = config.active_provider === p
               return (
-                <option key={p} value={p} style={configured ? undefined : { color: '#9ca3af' }}>
+                <option key={p} value={p} disabled={!configured && !isActive} style={configured ? undefined : { color: '#9ca3af' }}>
                   {p}{configured ? '' : ' (no key)'}
                 </option>
               )
