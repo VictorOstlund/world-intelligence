@@ -15,9 +15,9 @@ function getSql(): SqlFunction {
   return _sql
 }
 
-/** The neon driver supports string+params at runtime; this helper bypasses TS's template-only types */
+/** Use sql.query() for parameterised queries (neon v1+ API) */
 async function query(sqlStr: string, params?: unknown[]): Promise<Record<string, unknown>[]> {
-  return (getSql() as any)(sqlStr, params ?? []) as Promise<Record<string, unknown>[]>
+  return (getSql() as any).query(sqlStr, params ?? []) as Promise<Record<string, unknown>[]>
 }
 
 export async function initDb(): Promise<void> {
