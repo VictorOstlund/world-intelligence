@@ -1,0 +1,10 @@
+{
+  "slug": "world-intelligence",
+  "name": "world-intelligence",
+  "brainstorm": "human",
+  "github": true,
+  "deploy": "vercel",
+  "codexReview": false,
+  "designDoc": "plans/2026-03-04-world-intelligence-design.md",
+  "createdAt": "2026-03-04T11:13:00Z"
+}
