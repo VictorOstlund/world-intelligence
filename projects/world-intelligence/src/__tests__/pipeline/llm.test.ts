@@ -157,7 +157,7 @@ describe('estimateCost', () => {
   it('calculates Anthropic Haiku cost', () => {
     const cost = estimateCost('anthropic', 'claude-haiku-4-5', 1_000_000, 1_000_000)
     expect(cost).toBeGreaterThan(0)
-    expect(cost).toBeLessThan(5) // sanity: haiku is cheap
+    expect(cost).toBeLessThan(10) // sanity: haiku is cheap
   })
 
   it('calculates OpenAI GPT-4o cost', () => {

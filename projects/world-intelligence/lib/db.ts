@@ -43,7 +43,7 @@ export async function initDb(): Promise<void> {
   await rawQuery(`CREATE TABLE IF NOT EXISTS config (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     active_provider TEXT NOT NULL DEFAULT 'anthropic',
-    triage_model TEXT NOT NULL DEFAULT 'gemini-1.5-flash-8b',
+    triage_model TEXT NOT NULL DEFAULT 'gemini-2.5-flash-lite',
     synthesis_model TEXT NOT NULL DEFAULT 'claude-sonnet-4-6',
     triage_fallbacks TEXT NOT NULL DEFAULT '[]',
     synthesis_fallbacks TEXT NOT NULL DEFAULT '[]',

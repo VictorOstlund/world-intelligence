@@ -29,8 +29,8 @@ export interface LLMResult {
 // Price table: USD per 1M tokens (input, output)
 const PRICE_TABLE: Record<string, { input: number; output: number }> = {
   // Anthropic
-  'claude-haiku-4-5': { input: 0.25, output: 1.25 },
-  'claude-haiku-4-5-20251001': { input: 0.25, output: 1.25 },
+  'claude-haiku-4-5': { input: 1.0, output: 5.0 },
+  'claude-haiku-4-5-20251001': { input: 1.0, output: 5.0 },
   'claude-sonnet-4-6': { input: 3.0, output: 15.0 },
   'claude-sonnet-4-5': { input: 3.0, output: 15.0 },
   'claude-opus-4-6': { input: 15.0, output: 75.0 },
@@ -40,6 +40,7 @@ const PRICE_TABLE: Record<string, { input: number; output: number }> = {
   'gpt-4o-mini': { input: 0.15, output: 0.6 },
   'o1': { input: 15.0, output: 60.0 },
   'o3-mini': { input: 1.1, output: 4.4 },
+  'o4-mini': { input: 1.1, output: 4.4 },
   // Gemini
   'gemini-1.5-flash-8b': { input: 0.0375, output: 0.15 },
   'gemini-1.5-flash': { input: 0.075, output: 0.3 },
@@ -48,10 +49,8 @@ const PRICE_TABLE: Record<string, { input: number; output: number }> = {
   'gemini-3.1-flash-lite-preview': { input: 0.01, output: 0.04 },
   'gemini-2.5-flash-lite': { input: 0.02, output: 0.08 },
   'gemini-2.5-flash': { input: 0.075, output: 0.30 },
-  'gemini-3.1-pro': { input: 1.25, output: 5.00 },
+  'gemini-3.1-pro-preview': { input: 1.25, output: 5.00 },
   'gemini-3.1-flash-lite': { input: 0.01, output: 0.04 },
-  // Anthropic (additional)
-  'claude-haiku-3-5': { input: 0.25, output: 1.25 },
 }
 
 function isRetryableError(err: unknown): boolean {

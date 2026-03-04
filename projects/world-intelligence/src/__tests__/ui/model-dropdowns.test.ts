@@ -32,7 +32,7 @@ describe('PROVIDER_MODELS constant', () => {
   it('anthropic models include claude variants', async () => {
     const { PROVIDER_MODELS } = await import('../../../lib/models')
     const values = PROVIDER_MODELS.anthropic.map(m => m.value)
-    expect(values).toContain('claude-haiku-3-5')
+    expect(values).toContain('claude-haiku-4-5')
     expect(values).toContain('claude-sonnet-4-6')
     expect(values).toContain('claude-opus-4-6')
   })
@@ -41,7 +41,7 @@ describe('PROVIDER_MODELS constant', () => {
     const { PROVIDER_MODELS } = await import('../../../lib/models')
     const values = PROVIDER_MODELS.gemini.map(m => m.value)
     expect(values).toContain('gemini-2.5-flash')
-    expect(values).toContain('gemini-3.1-pro')
+    expect(values).toContain('gemini-3.1-pro-preview')
   })
 
   it('getModelsForProvider returns models for given provider', async () => {
