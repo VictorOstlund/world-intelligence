@@ -89,7 +89,7 @@ export default function ReportsPage() {
       const res = await fetch('/api/pipeline/run', { method: 'POST' })
       const data = await res.json()
       if (!res.ok) {
-        setRunError(data.error || 'Pipeline failed')
+        setRunError(data.error || 'Report run failed')
       } else {
         setOffset(0)
         await fetchReports('', 0)
@@ -127,7 +127,7 @@ export default function ReportsPage() {
               <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
               Running...
             </span>
-          ) : 'Run Pipeline'}
+          ) : 'Run Report'}
         </button>
       </div>
 
@@ -156,7 +156,7 @@ export default function ReportsPage() {
             </svg>
           </div>
           <p className="text-wi-secondary text-sm mb-1">No reports yet</p>
-          <p className="text-wi-secondary/60 text-xs">Click &quot;Run Pipeline&quot; to generate the first one.</p>
+          <p className="text-wi-secondary/60 text-xs">Click &quot;Run Report&quot; to generate the first one.</p>
         </div>
       ) : (
         <>

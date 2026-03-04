@@ -355,7 +355,7 @@ export default function SettingsPage() {
         {/* Schedule Section */}
         <section className="bg-wi-surface border border-wi-border rounded-xl p-5">
           <SectionHeader title="Schedule" />
-          <label className="block text-xs text-wi-secondary mb-1.5">Run pipeline every N hours (1-24)</label>
+          <label className="block text-xs text-wi-secondary mb-1.5">Run report every N hours (1-24)</label>
           <input
             type="number"
             min={1}
