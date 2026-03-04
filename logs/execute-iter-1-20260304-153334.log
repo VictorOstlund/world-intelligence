@@ -1,0 +1,8 @@
+**Task wi-eeg.1 complete.** Summary:
+
+- **GET /api/settings** now returns `__masked__` sentinel (not `*****`) for saved API keys
+- **POST /api/settings** detects `__masked__` and preserves existing DB key instead of overwriting
+- **Settings UI** tracks saved state, shows placeholder "API key saved (enter new to change)", sends sentinel back for unchanged keys
+- Fixed `.query` property on mock-neon (pre-existing bug exposed by `rawQuery`)
+- **93 tests pass**, build clean
+- **Next task**: wi-41y — Markdown rendering in report viewer

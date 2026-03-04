@@ -1,0 +1,7 @@
+**Task wi-id0 complete.** Summary:
+
+- **Created** `lib/models.ts` — single source of truth with `PROVIDER_MODELS` for all 4 providers (Anthropic, OpenAI, Azure, Gemini), plus `getModelsForProvider` and `getModelsWithCustom` helpers
+- **Updated** `app/settings/page.tsx` — replaced free-text `<input>` fields with `<select>` dropdowns for triage model, synthesis model, and all fallback model fields via a `ModelSelect` component
+- **Custom model handling** — saved values not in the dropdown list appear as a disabled "custom: [value]" option
+- **9 new tests**, 112 total passing, build clean
+- **Next task**: wi-54m — Article deduplication with seen_articles table (R5, last remaining epic criterion)

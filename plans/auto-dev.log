@@ -30,3 +30,40 @@ Done. Task `wi-e7j` complete, epic `wi-ijs` fully closed.
 Review complete. **Stage summary written to `plans/stage_summary.json`**: `{"stage": "review", "summary": "gaps-fixed", "gaps_found": 1, "gaps_fixed": 1}`.
 
 The implementation faithfully matches the epic spec. The one gap (stale "SQLite" comment in `categories.ts`) was fixed immediately. All 89 tests pass, build is clean, and every anti-pattern was verified absent.
+
+════════════ STAGE: create-epic | 2026-03-04 15:33:34 UTC ════════════
+Done. Here's what was created:
+
+- **Epic**: `wi-eeg` — "Feature: world-intelligence polish v1" (P1) with full design covering all 6 sections (Requirements, Success Criteria, Anti-Patterns, Approach, Architecture, Design Rationale)
+- **Task 1**: `wi-eeg.1` — "Task 1: API key sentinel masking and display" (P1, child of epic) with TDD steps, exact file paths, and success criteria
+- **Saved**: `plans/epic.json` with both IDs
+
+No code written. Ready to execute when you give the go-ahead.
+
+════════════ STAGE: execute-iter-1 | 2026-03-04 15:38:12 UTC ════════════
+**Task wi-eeg.1 complete.** Summary:
+
+- **GET /api/settings** now returns `__masked__` sentinel (not `*****`) for saved API keys
+- **POST /api/settings** detects `__masked__` and preserves existing DB key instead of overwriting
+- **Settings UI** tracks saved state, shows placeholder "API key saved (enter new to change)", sends sentinel back for unchanged keys
+- Fixed `.query` property on mock-neon (pre-existing bug exposed by `rawQuery`)
+- **93 tests pass**, build clean
+- **Next task**: wi-41y — Markdown rendering in report viewer
+
+════════════ STAGE: execute-iter-2 | 2026-03-04 15:43:12 UTC ════════════
+Task **wi-41y** complete.
+
+**What was done:** Replaced the raw `<pre>` report body renderer with `<ReactMarkdown remarkPlugins={[remarkGfm]}>` in `app/reports/[id]/page.tsx`. Added `@tailwindcss/typography` prose styling for clean headings, lists, tables, code blocks, bold/italic rendering.
+
+**Results:** 6 new tests, 99 total passing, build clean.
+
+**Next task:** `wi-2a8` — Synthesis and triage prompt upgrade for all 6 report sections (R3).
+
+════════════ STAGE: execute-iter-1 | 2026-03-04 15:50:23 UTC ════════════
+**Task wi-id0 complete.** Summary:
+
+- **Created** `lib/models.ts` — single source of truth with `PROVIDER_MODELS` for all 4 providers (Anthropic, OpenAI, Azure, Gemini), plus `getModelsForProvider` and `getModelsWithCustom` helpers
+- **Updated** `app/settings/page.tsx` — replaced free-text `<input>` fields with `<select>` dropdowns for triage model, synthesis model, and all fallback model fields via a `ModelSelect` component
+- **Custom model handling** — saved values not in the dropdown list appear as a disabled "custom: [value]" option
+- **9 new tests**, 112 total passing, build clean
+- **Next task**: wi-54m — Article deduplication with seen_articles table (R5, last remaining epic criterion)

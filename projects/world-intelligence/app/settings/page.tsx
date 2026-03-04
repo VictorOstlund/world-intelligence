@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { getModelsWithCustom, type ModelOption } from '../../lib/models'
 
 interface ProviderEntry {
   apiKey?: string
@@ -25,6 +26,30 @@ interface CategoryConfig {
 }
 
 const PROVIDERS = ['anthropic', 'openai', 'azure', 'gemini'] as const
+const MASKED_KEY_SENTINEL = '__masked__'
+
+function ModelSelect({ provider, value, onChange, placeholder }: {
+  provider: string
+  value: string
+  onChange: (v: string) => void
+  placeholder?: string
+}) {
+  const options = getModelsWithCustom(provider, value || undefined)
+  return (
+    <select
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      className="w-full mt-1 px-3 py-2 text-sm border border-zinc-300 dark:border-zinc-700 rounded bg-white dark:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
+    >
+      <option value="">{placeholder || 'Select model...'}</option>
+      {options.map(m => (
+        <option key={m.value} value={m.value} disabled={m.disabled}>
+          {m.label}
+        </option>
+      ))}
+    </select>
+  )
+}
 
 export default function SettingsPage() {
   const [config, setConfig] = useState<Config>({})
@@ -32,12 +57,25 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [saveMsg, setSaveMsg] = useState<string | null>(null)
+  // Track which providers had a saved key on load (sentinel detected)
+  const [savedKeys, setSavedKeys] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
     Promise.all([
       fetch('/api/settings').then(r => r.json()),
       fetch('/api/settings/categories').then(r => r.json()),
     ]).then(([cfg, cats]) => {
+      // Detect sentinel values and track which providers have saved keys
+      const keySaved: Record<string, boolean> = {}
+      if (cfg.providers && typeof cfg.providers === 'object') {
+        for (const [prov, provCfg] of Object.entries(cfg.providers as Record<string, ProviderEntry>)) {
+          if (provCfg?.apiKey === MASKED_KEY_SENTINEL) {
+            keySaved[prov] = true
+            provCfg.apiKey = '' // Clear sentinel from local state
+          }
+        }
+      }
+      setSavedKeys(keySaved)
       setConfig(cfg)
       setCategories(cats)
     }).finally(() => setLoading(false))
@@ -48,6 +86,10 @@ export default function SettingsPage() {
   }
 
   function setProviderKey(provider: string, field: keyof ProviderEntry, value: string) {
+    if (field === 'apiKey' && value !== '') {
+      // User typed a new value — clear saved state so sentinel won't be sent
+      setSavedKeys(s => ({ ...s, [provider]: false }))
+    }
     setConfig(c => ({
       ...c,
       providers: {
@@ -83,11 +125,23 @@ export default function SettingsPage() {
     setSaving(true)
     setSaveMsg(null)
     try {
+      // Build config to send — restore sentinel for unchanged saved keys
+      const configToSend = { ...config }
+      if (configToSend.providers) {
+        const providers = { ...configToSend.providers }
+        for (const prov of PROVIDERS) {
+          if (savedKeys[prov] && !providers[prov]?.apiKey) {
+            // User didn't type a new value — send sentinel to preserve existing key
+            providers[prov] = { ...(providers[prov] || {}), apiKey: MASKED_KEY_SENTINEL }
+          }
+        }
+        configToSend.providers = providers
+      }
       const [settingsRes, categoriesRes] = await Promise.all([
         fetch('/api/settings', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(config),
+          body: JSON.stringify(configToSend),
         }),
         fetch('/api/settings/categories', {
           method: 'POST',
@@ -151,8 +205,8 @@ export default function SettingsPage() {
                 <p className="text-sm font-medium mb-2 capitalize">{provider}</p>
                 <input
                   type="password"
-                  placeholder="API Key"
-                  value={config.providers?.[provider]?.apiKey === '*****' ? '' : (config.providers?.[provider]?.apiKey || '')}
+                  placeholder={savedKeys[provider] ? 'API key saved (enter new to change)' : 'API Key'}
+                  value={config.providers?.[provider]?.apiKey || ''}
                   onChange={e => setProviderKey(provider, 'apiKey', e.target.value)}
                   className="w-full px-3 py-2 text-sm border border-zinc-300 dark:border-zinc-700 rounded bg-white dark:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400 mb-2"
                 />
@@ -185,41 +239,37 @@ export default function SettingsPage() {
           <div className="space-y-3">
             <div>
               <label className="block text-sm text-zinc-600 dark:text-zinc-400 mb-1">Triage model</label>
-              <input
-                type="text"
+              <ModelSelect
+                provider={config.active_provider || 'anthropic'}
                 value={config.triage_model || ''}
-                onChange={e => setConfigField('triage_model', e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-zinc-300 dark:border-zinc-700 rounded bg-white dark:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
+                onChange={v => setConfigField('triage_model', v)}
               />
-              <p className="text-xs text-zinc-400 mt-1">Fallbacks (one per line, up to 2 additional):</p>
+              <p className="text-xs text-zinc-400 mt-1">Fallbacks (up to 2 additional):</p>
               {[0, 1].map(i => (
-                <input
+                <ModelSelect
                   key={i}
-                  type="text"
-                  placeholder={`Fallback ${i + 1}`}
+                  provider={config.active_provider || 'anthropic'}
                   value={triageFallbacks[i] || ''}
-                  onChange={e => setFallback('triage_fallbacks', i, e.target.value)}
-                  className="w-full mt-1 px-3 py-2 text-sm border border-zinc-300 dark:border-zinc-700 rounded bg-white dark:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
+                  onChange={v => setFallback('triage_fallbacks', i, v)}
+                  placeholder={`Fallback ${i + 1}`}
                 />
               ))}
             </div>
             <div>
               <label className="block text-sm text-zinc-600 dark:text-zinc-400 mb-1">Synthesis model</label>
-              <input
-                type="text"
+              <ModelSelect
+                provider={config.active_provider || 'anthropic'}
                 value={config.synthesis_model || ''}
-                onChange={e => setConfigField('synthesis_model', e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-zinc-300 dark:border-zinc-700 rounded bg-white dark:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
+                onChange={v => setConfigField('synthesis_model', v)}
               />
               <p className="text-xs text-zinc-400 mt-1">Fallbacks (up to 2 additional):</p>
               {[0, 1].map(i => (
-                <input
+                <ModelSelect
                   key={i}
-                  type="text"
-                  placeholder={`Fallback ${i + 1}`}
+                  provider={config.active_provider || 'anthropic'}
                   value={synthFallbacks[i] || ''}
-                  onChange={e => setFallback('synthesis_fallbacks', i, e.target.value)}
-                  className="w-full mt-1 px-3 py-2 text-sm border border-zinc-300 dark:border-zinc-700 rounded bg-white dark:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
+                  onChange={v => setFallback('synthesis_fallbacks', i, v)}
+                  placeholder={`Fallback ${i + 1}`}
                 />
               ))}
             </div>

@@ -80,6 +80,12 @@ export async function initDb(): Promise<void> {
 
   await rawQuery(`DROP TRIGGER IF EXISTS reports_search_vector_trigger ON reports`)
   await rawQuery(`CREATE TRIGGER reports_search_vector_trigger BEFORE INSERT OR UPDATE ON reports FOR EACH ROW EXECUTE FUNCTION reports_search_vector_update()`)
+
+  await rawQuery(`CREATE TABLE IF NOT EXISTS seen_articles (
+    url TEXT PRIMARY KEY,
+    first_seen_at BIGINT NOT NULL,
+    report_id TEXT NOT NULL
+  )`)
 }
 
 export async function getUser(username: string): Promise<{ id: string; username: string; password_hash: string; created_at: number } | undefined> {
@@ -211,6 +217,46 @@ export async function searchReports(queryStr: string, limit: number): Promise<Re
   } catch {
     return []
   }
+}
+
+export async function markArticlesSeen(urls: string[], reportId: string): Promise<void> {
+  if (urls.length === 0) return
+  const now = Date.now()
+  for (const url of urls) {
+    try {
+      await query(
+        'INSERT INTO seen_articles (url, first_seen_at, report_id) VALUES ($1, $2, $3) ON CONFLICT (url) DO NOTHING',
+        [url, now, reportId],
+      )
+    } catch (err) {
+      console.error(`[dedup] Failed to mark article seen: ${url}`, err)
+      // Non-blocking: report is more important than perfect dedup
+    }
+  }
+}
+
+export async function filterSeenUrls<T extends { url: string; importanceScore: number }>(items: T[]): Promise<T[]> {
+  if (items.length === 0) return []
+  const urls = items.map(i => i.url)
+  const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000
+
+  let seenUrls: Set<string>
+  try {
+    const rows = await query(
+      'SELECT url FROM seen_articles WHERE url = ANY($1) AND first_seen_at > $2',
+      [urls, thirtyDaysAgo],
+    )
+    seenUrls = new Set(rows.map(r => r.url as string))
+  } catch (err) {
+    console.error('[dedup] Failed to query seen_articles, skipping dedup', err)
+    return items // Non-blocking: if dedup fails, pass everything through
+  }
+
+  return items.filter(item => {
+    if (!seenUrls.has(item.url)) return true // not seen
+    if (item.importanceScore >= 9) return true // breaking development
+    return false // seen within 30 days and not critical
+  })
 }
 
 export async function seedIfEmpty(): Promise<void> {

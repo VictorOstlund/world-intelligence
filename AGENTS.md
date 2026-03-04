@@ -2,7 +2,26 @@
 
 ## Your job
 
-Run the Lobster pipeline via `run-lobster.sh`. Do NOT implement anything directly yourself — all building happens inside the lobster stages (which use Claude Code).
+Run build scripts when instructed. Do NOT implement anything directly yourself.
+
+## ⚠️ LOCKFILE RULE — READ BEFORE RUNNING ANYTHING
+
+Before calling `run-lobster.sh` OR `run-auto-dev.sh` OR `run-auto-dev-full.sh`, ALWAYS check:
+
+```bash
+# For auto-dev:
+ls /tmp/autodev-world-intelligence.lockdir 2>/dev/null && echo "RUNNING — DO NOT START" || echo "clear"
+# For lobster:
+ls /tmp/lobster-world-intelligence.lockdir 2>/dev/null && echo "RUNNING — DO NOT START" || echo "clear"
+```
+
+If the lockdir exists AND the pid in the `.lock` file is alive (`kill -0 <pid>`): **stop, post "already running" to thread, do nothing.**
+Never launch a second instance. One run at a time, always.
+
+## ⛔ NO AUTONOMOUS CHAINING
+
+NEVER start a new auto-dev or pipeline run on your own after one completes.
+ONLY run when Victor explicitly says to in this thread. One job, one instruction, full stop.
 
 When you receive "run pipeline" in this thread:
 1. Read MEMORY.md: confirm slug, design doc path, thread ID

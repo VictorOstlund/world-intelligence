@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { getConfig, saveConfig } from '../../../lib/db'
 
+const MASKED_KEY_SENTINEL = '__masked__'
+
 function redactProviders(providers: unknown): unknown {
   if (!providers || typeof providers !== 'object') return providers
   const result: Record<string, unknown> = {}
@@ -8,7 +10,7 @@ function redactProviders(providers: unknown): unknown {
     if (prov && typeof prov === 'object') {
       const redacted: Record<string, unknown> = { ...(prov as Record<string, unknown>) }
       if (redacted.apiKey) {
-        redacted.apiKey = '*****'
+        redacted.apiKey = MASKED_KEY_SENTINEL
       }
       result[name] = redacted
     } else {
@@ -41,9 +43,31 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'invalid request' }, { status: 400 })
   }
 
-  // Serialize providers as JSON string if present
+  // Merge provider keys: if sentinel, preserve existing DB value
   if (body.providers && typeof body.providers === 'object') {
-    body = { ...body, providers: JSON.stringify(body.providers) }
+    const incoming = body.providers as Record<string, Record<string, unknown>>
+    const existing = await getConfig()
+    let existingProviders: Record<string, Record<string, unknown>> = {}
+    try {
+      const raw = existing.providers
+      existingProviders = typeof raw === 'string' ? JSON.parse(raw) : (raw as Record<string, Record<string, unknown>>) || {}
+    } catch {
+      existingProviders = {}
+    }
+
+    for (const [provName, prov] of Object.entries(incoming)) {
+      if (prov && typeof prov === 'object' && prov.apiKey === MASKED_KEY_SENTINEL) {
+        // Preserve existing key from DB
+        const existingKey = existingProviders[provName]?.apiKey
+        if (existingKey) {
+          prov.apiKey = existingKey as string
+        } else {
+          delete prov.apiKey
+        }
+      }
+    }
+
+    body = { ...body, providers: JSON.stringify(incoming) }
   }
 
   await saveConfig(body)

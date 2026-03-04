@@ -41,18 +41,31 @@ describe('GET /api/settings', () => {
     expect(json).toHaveProperty('active_provider', 'anthropic')
     expect(json).toHaveProperty('triage_model')
     expect(json).toHaveProperty('synthesis_model')
-    // Provider keys must be redacted
+    // Provider keys must be redacted — never return actual key
     const text = JSON.stringify(json)
     expect(text).not.toContain('sk-ant-super-secret-key')
     expect(text).not.toContain('sk-openai-secret')
-    // But structure should exist (keys replaced with ****)
-    const providers = json.providers
-    if (providers && typeof providers === 'object') {
-      const anthropicKey = providers?.anthropic?.apiKey
-      if (anthropicKey) {
-        expect(anthropicKey).toBe('*****')
-      }
-    }
+  })
+
+  it('returns __masked__ sentinel when provider has a saved key', async () => {
+    const { GET } = await import('../../../app/api/settings/route')
+    const req = new Request('http://localhost/api/settings')
+    const res = await GET(req)
+    const json = await res.json()
+    // Providers with saved keys must return '__masked__' sentinel
+    expect(json.providers.anthropic.apiKey).toBe('__masked__')
+    expect(json.providers.openai.apiKey).toBe('__masked__')
+  })
+
+  it('returns empty string when provider has no saved key', async () => {
+    const { GET } = await import('../../../app/api/settings/route')
+    const req = new Request('http://localhost/api/settings')
+    const res = await GET(req)
+    const json = await res.json()
+    // Providers without saved keys should return '' (not __masked__)
+    // gemini was never configured in our seed data
+    const geminiKey = json.providers?.gemini?.apiKey
+    expect(geminiKey === '' || geminiKey === undefined).toBe(true)
   })
 })
 
@@ -98,6 +111,50 @@ describe('POST /api/settings', () => {
     const config = await getConfig() as any
     const providers = typeof config.providers === 'string' ? JSON.parse(config.providers) : config.providers
     expect(providers?.anthropic?.apiKey).toBe('sk-ant-new-key')
+  })
+
+  it('preserves existing key when POST sends __masked__ sentinel', async () => {
+    // First, ensure we have a known key in DB
+    const { POST: POST1 } = await import('../../../app/api/settings/route')
+    await POST1(new Request('http://localhost/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        providers: { anthropic: { apiKey: 'sk-ant-preserved-key' } },
+      }),
+    }))
+
+    // Now POST with sentinel — should NOT overwrite
+    const { POST: POST2 } = await import('../../../app/api/settings/route')
+    await POST2(new Request('http://localhost/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        providers: { anthropic: { apiKey: '__masked__' } },
+      }),
+    }))
+
+    // Verify the original key is still in DB
+    const { getConfig } = await import('../../../lib/db')
+    const config = await getConfig() as any
+    const providers = typeof config.providers === 'string' ? JSON.parse(config.providers) : config.providers
+    expect(providers?.anthropic?.apiKey).toBe('sk-ant-preserved-key')
+  })
+
+  it('replaces existing key when POST sends a new non-sentinel value', async () => {
+    const { POST } = await import('../../../app/api/settings/route')
+    await POST(new Request('http://localhost/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        providers: { anthropic: { apiKey: 'sk-ant-brand-new-key' } },
+      }),
+    }))
+
+    const { getConfig } = await import('../../../lib/db')
+    const config = await getConfig() as any
+    const providers = typeof config.providers === 'string' ? JSON.parse(config.providers) : config.providers
+    expect(providers?.anthropic?.apiKey).toBe('sk-ant-brand-new-key')
   })
 })
 

@@ -1,0 +1,10 @@
+Done. Task `wi-54m` (Article deduplication) is complete and the epic `wi-eeg` is fully closed.
+
+**What was implemented:**
+- `seen_articles` table in the schema (url PK, first_seen_at, report_id)
+- `markArticlesSeen()` — bulk insert with ON CONFLICT DO NOTHING, non-blocking on failure
+- `filterSeenUrls()` — filters seen URLs within 30 days, importance >=9 bypasses dedup, >30 day articles exempt
+- Pipeline wiring: filter after triage, mark after save
+- 8 new tests, all 120 tests pass, build clean
+
+All 5 epic requirements (R1–R5) are now met. `iteration-result.json` written with `"done": true`.

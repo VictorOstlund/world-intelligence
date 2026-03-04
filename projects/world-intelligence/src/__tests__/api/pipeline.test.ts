@@ -55,6 +55,8 @@ beforeAll(async () => {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  // Clear seen_articles between tests so dedup doesn't leak across tests
+  store.seen_articles.length = 0
 })
 
 const triagedJson = JSON.stringify([
@@ -224,5 +226,128 @@ describe('POST /api/pipeline/run', () => {
     for (const cat of FIVE_CATS) {
       expect(categoriesFetched).toContain(cat)
     }
+  })
+
+  it('second pipeline run deduplicates previously seen articles', async () => {
+    const { callLLM, estimateCost } = await import('../../../lib/llm')
+    const { loadFeedList, fetchCategory } = await import('../../../lib/feeds')
+    const { saveConfig } = await import('../../../lib/db')
+
+    // Restore 2-category config
+    const ALL_CAT_NAMES = [
+      'geopolitics', 'economics', 'technology', 'climate', 'energy',
+      'defense', 'finance', 'health', 'science', 'society', 'media',
+      'conflict', 'trade', 'infrastructure', 'emerging-markets',
+    ]
+    const categoryConfig = Object.fromEntries(
+      ALL_CAT_NAMES.map(k => [k, { enabled: ENABLED_CATS.includes(k), itemBudget: 5 }])
+    )
+    await saveConfig({
+      active_provider: 'anthropic',
+      triage_model: 'gemini-1.5-flash-8b',
+      synthesis_model: 'claude-sonnet-4-6',
+      triage_fallbacks: '[]',
+      synthesis_fallbacks: '[]',
+      schedule_hours: 6,
+      category_config: JSON.stringify(categoryConfig),
+      providers: JSON.stringify({ anthropic: { apiKey: 'sk-ant-test' } }),
+    })
+
+    vi.mocked(loadFeedList).mockResolvedValue({
+      geopolitics: ['https://example.com/feed.rss'],
+      economics: ['https://example.com/eco.rss'],
+    })
+    vi.mocked(fetchCategory).mockResolvedValue([
+      { title: 'Test Event', description: 'Something happened', url: 'https://example.com/dedup-1', pubDate: '2026-03-04', category: 'geopolitics' },
+    ])
+    const dedupTriagedJson = JSON.stringify([
+      { url: 'https://example.com/dedup-1', relevanceScore: 7, noveltyScore: 6, importanceScore: 7 },
+    ])
+    vi.mocked(callLLM).mockImplementation(async (prompt: string) => {
+      if (prompt.includes('triage agent')) {
+        return { text: dedupTriagedJson, inputTokens: 100, outputTokens: 50 }
+      }
+      return { text: synthesisText, inputTokens: 500, outputTokens: 300 }
+    })
+    vi.mocked(estimateCost).mockReturnValue(0.02)
+
+    // First run — items should pass through
+    const { POST } = await import('../../../app/api/pipeline/run/route')
+    const res1 = await POST(new Request('http://localhost/api/pipeline/run', { method: 'POST' }))
+    expect(res1.status).toBe(200)
+    const json1 = await res1.json()
+    expect(json1.itemCount).toBeGreaterThan(0)
+
+    // Verify articles are now marked as seen
+    expect(store.seen_articles.length).toBeGreaterThan(0)
+    expect(store.seen_articles.some(a => a.url === 'https://example.com/dedup-1')).toBe(true)
+
+    // Second run — same URLs should be filtered by dedup
+    const res2 = await POST(new Request('http://localhost/api/pipeline/run', { method: 'POST' }))
+    expect(res2.status).toBe(200)
+    const json2 = await res2.json()
+    expect(json2.itemCount).toBe(0) // all items deduped
+    expect(json2.itemCount).toBeLessThan(json1.itemCount)
+  })
+
+  it('item with importanceScore >= 9 bypasses dedup even if seen', async () => {
+    const { callLLM, estimateCost } = await import('../../../lib/llm')
+    const { loadFeedList, fetchCategory } = await import('../../../lib/feeds')
+    const { saveConfig } = await import('../../../lib/db')
+
+    // Restore 2-category config
+    const ALL_CAT_NAMES = [
+      'geopolitics', 'economics', 'technology', 'climate', 'energy',
+      'defense', 'finance', 'health', 'science', 'society', 'media',
+      'conflict', 'trade', 'infrastructure', 'emerging-markets',
+    ]
+    const categoryConfig = Object.fromEntries(
+      ALL_CAT_NAMES.map(k => [k, { enabled: ENABLED_CATS.includes(k), itemBudget: 5 }])
+    )
+    await saveConfig({
+      active_provider: 'anthropic',
+      triage_model: 'gemini-1.5-flash-8b',
+      synthesis_model: 'claude-sonnet-4-6',
+      triage_fallbacks: '[]',
+      synthesis_fallbacks: '[]',
+      schedule_hours: 6,
+      category_config: JSON.stringify(categoryConfig),
+      providers: JSON.stringify({ anthropic: { apiKey: 'sk-ant-test' } }),
+    })
+
+    const breakingUrl = 'https://example.com/breaking-9'
+    vi.mocked(loadFeedList).mockResolvedValue({
+      geopolitics: ['https://example.com/feed.rss'],
+      economics: ['https://example.com/eco.rss'],
+    })
+    vi.mocked(fetchCategory).mockResolvedValue([
+      { title: 'Breaking News', description: 'Critical update', url: breakingUrl, pubDate: '2026-03-04', category: 'geopolitics' },
+    ])
+    const breakingTriagedJson = JSON.stringify([
+      { url: breakingUrl, relevanceScore: 9, noveltyScore: 9, importanceScore: 9 },
+    ])
+    vi.mocked(callLLM).mockImplementation(async (prompt: string) => {
+      if (prompt.includes('triage agent')) {
+        return { text: breakingTriagedJson, inputTokens: 100, outputTokens: 50 }
+      }
+      return { text: synthesisText, inputTokens: 500, outputTokens: 300 }
+    })
+    vi.mocked(estimateCost).mockReturnValue(0.02)
+
+    // First run
+    const { POST } = await import('../../../app/api/pipeline/run/route')
+    const res1 = await POST(new Request('http://localhost/api/pipeline/run', { method: 'POST' }))
+    expect(res1.status).toBe(200)
+    const json1 = await res1.json()
+    expect(json1.itemCount).toBeGreaterThan(0)
+
+    // URL is now seen
+    expect(store.seen_articles.some(a => a.url === breakingUrl)).toBe(true)
+
+    // Second run — importance >= 9 should bypass dedup
+    const res2 = await POST(new Request('http://localhost/api/pipeline/run', { method: 'POST' }))
+    expect(res2.status).toBe(200)
+    const json2 = await res2.json()
+    expect(json2.itemCount).toBeGreaterThan(0) // passes through despite being seen
   })
 })

@@ -8,10 +8,11 @@ interface Store {
   users: Record<string, unknown>[]
   config: Record<string, unknown>[]
   reports: Record<string, unknown>[]
+  seen_articles: Record<string, unknown>[]
 }
 
 export function createMockStore(): Store {
-  return { users: [], config: [], reports: [] }
+  return { users: [], config: [], reports: [], seen_articles: [] }
 }
 
 export function createMockSql(store: Store) {
@@ -116,8 +117,31 @@ export function createMockSql(store: Store) {
       return row ? [row] : []
     }
 
+    // INSERT INTO seen_articles ... ON CONFLICT DO NOTHING
+    if (q.includes('insert into seen_articles')) {
+      const [url, first_seen_at, report_id] = params as any[]
+      const exists = store.seen_articles.find(a => a.url === url)
+      if (!exists) {
+        store.seen_articles.push({ url, first_seen_at, report_id })
+      }
+      return []
+    }
+
+    // SELECT url FROM seen_articles WHERE url = ANY($1) AND first_seen_at > $2
+    if (q.includes('from seen_articles') && q.includes('where') && q.includes('url')) {
+      const urls = (params as any[])[0] as string[]
+      const cutoff = Number((params as any[])[1])
+      const matches = store.seen_articles.filter(
+        a => urls.includes(a.url as string) && Number(a.first_seen_at) > cutoff
+      )
+      return matches.map(a => ({ url: a.url }))
+    }
+
     return []
   })
+
+  // rawQuery in db.ts calls getSql().query(sql, params)
+  mockSql.query = mockSql
 
   return mockSql
 }

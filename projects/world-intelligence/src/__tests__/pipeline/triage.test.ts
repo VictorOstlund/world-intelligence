@@ -177,4 +177,74 @@ describe('synthesizeReport', () => {
     expect(result.summary).toBeTruthy()
     expect(result.summary.length).toBeGreaterThan(5)
   })
+
+  it('synthesis prompt requests all 6 report sections', async () => {
+    const { callLLM } = await import('../../../lib/llm')
+    let capturedPrompt = ''
+    vi.mocked(callLLM).mockImplementation(async (prompt: string) => {
+      capturedPrompt = prompt
+      return { text: '# Report\n\n## Executive Summary\nTest.', inputTokens: 100, outputTokens: 50 }
+    })
+
+    await synthesizeReport(scoredItems, synthesisConfig)
+
+    expect(capturedPrompt).toContain('Executive Summary')
+    expect(capturedPrompt).toContain('Key Themes')
+    expect(capturedPrompt).toContain('Critical Events')
+    expect(capturedPrompt).toContain('Opportunities')
+    expect(capturedPrompt).toContain('Contrarian Angles')
+    expect(capturedPrompt).toContain('Coverage Gaps')
+  })
+
+  it('synthesis prompt includes European high-yield credit analyst context', async () => {
+    const { callLLM } = await import('../../../lib/llm')
+    let capturedPrompt = ''
+    vi.mocked(callLLM).mockImplementation(async (prompt: string) => {
+      capturedPrompt = prompt
+      return { text: '# Report\n\n## Executive Summary\nTest.', inputTokens: 100, outputTokens: 50 }
+    })
+
+    await synthesizeReport(scoredItems, synthesisConfig)
+
+    expect(capturedPrompt.toLowerCase()).toContain('european')
+    expect(capturedPrompt.toLowerCase()).toContain('high-yield credit')
+  })
+
+  it('synthesis prompt requests report header with metadata', async () => {
+    const { callLLM } = await import('../../../lib/llm')
+    let capturedPrompt = ''
+    vi.mocked(callLLM).mockImplementation(async (prompt: string) => {
+      capturedPrompt = prompt
+      return { text: '# Report\n\n## Executive Summary\nTest.', inputTokens: 100, outputTokens: 50 }
+    })
+
+    await synthesizeReport(scoredItems, synthesisConfig)
+
+    // Prompt should instruct model to include header metadata
+    expect(capturedPrompt.toLowerCase()).toMatch(/timestamp|date/)
+    expect(capturedPrompt.toLowerCase()).toMatch(/categor/)
+    expect(capturedPrompt.toLowerCase()).toMatch(/sources?\s+count|number of sources|sources?\s+reviewed/)
+    expect(capturedPrompt.toLowerCase()).toMatch(/items?\s+reviewed|items?\s+count|number of items/)
+  })
+})
+
+describe('triageCategory prompt', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('triage prompt requests contrarian_signal boolean field', async () => {
+    const { callLLM } = await import('../../../lib/llm')
+    let capturedPrompt = ''
+    vi.mocked(callLLM).mockImplementation(async (prompt: string) => {
+      capturedPrompt = prompt
+      return { text: JSON.stringify([
+        { url: 'https://example.com/1', relevanceScore: 7, noveltyScore: 6, importanceScore: 7, contrarian_signal: false },
+      ]), inputTokens: 100, outputTokens: 50 }
+    })
+
+    await triageCategory('geopolitics', [mockItems[0]], triageConfig)
+
+    expect(capturedPrompt).toContain('contrarian_signal')
+  })
 })

@@ -1,0 +1,7 @@
+Done. Here's what was created:
+
+- **Epic**: `wi-eeg` — "Feature: world-intelligence polish v1" (P1) with full design covering all 6 sections (Requirements, Success Criteria, Anti-Patterns, Approach, Architecture, Design Rationale)
+- **Task 1**: `wi-eeg.1` — "Task 1: API key sentinel masking and display" (P1, child of epic) with TDD steps, exact file paths, and success criteria
+- **Saved**: `plans/epic.json` with both IDs
+
+No code written. Ready to execute when you give the go-ahead.

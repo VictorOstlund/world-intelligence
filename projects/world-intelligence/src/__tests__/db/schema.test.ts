@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeAll } from 'vitest'
 
 const mockSql = vi.fn().mockResolvedValue([])
+;(mockSql as any).query = mockSql
 
 vi.mock('@neondatabase/serverless', () => ({
   neon: vi.fn().mockReturnValue(mockSql),

@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 interface Report {
   id: string
@@ -110,10 +112,10 @@ export default function ReportPage() {
           </div>
         </div>
 
-        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg p-6">
-          <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-zinc-800 dark:text-zinc-200">
+        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg p-6 prose prose-zinc dark:prose-invert prose-sm max-w-none">
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>
             {report.body}
-          </pre>
+          </ReactMarkdown>
         </div>
       </main>
     </div>

@@ -6,12 +6,13 @@
 
 import { callLLM, estimateCost, type LLMConfig, type FallbackModel } from './llm'
 import { fetchFullArticle, fetchCategory, loadFeedList, type FeedItem } from './feeds'
-import { getConfig, getActiveCategoryConfig, saveReport, type Report } from './db'
+import { getConfig, getActiveCategoryConfig, saveReport, markArticlesSeen, filterSeenUrls, type Report } from './db'
 
 export interface ScoredItem extends FeedItem {
   relevanceScore: number
   noveltyScore: number
   importanceScore: number
+  contrarian_signal?: boolean
 }
 
 function extractJson(text: string): unknown {
@@ -34,7 +35,8 @@ export async function triageCategory(
 
   const prompt = `You are a news triage agent for the "${category}" category.
 Score each item below for relevance (to ${category}), novelty, and importance (each 0-10).
-Return ONLY a JSON array with objects: { url, relevanceScore, noveltyScore, importanceScore }.
+Also flag contrarian_signal: true if the item presents a view that contradicts mainstream coverage, highlights something major outlets are underweighting, or reveals a notable silence/gap in coverage.
+Return ONLY a JSON array with objects: { url, relevanceScore, noveltyScore, importanceScore, contrarian_signal }.
 No explanations, no markdown, just the JSON array.
 
 Items:
@@ -47,7 +49,7 @@ ${items.map(i => `- url: ${i.url}\n  title: ${i.title}\n  description: ${i.descr
     return []
   }
 
-  let parsed: Array<{ url: string; relevanceScore: number; noveltyScore: number; importanceScore: number }>
+  let parsed: Array<{ url: string; relevanceScore: number; noveltyScore: number; importanceScore: number; contrarian_signal?: boolean }>
   try {
     parsed = extractJson(result.text) as typeof parsed
     if (!Array.isArray(parsed)) return []
@@ -66,6 +68,7 @@ ${items.map(i => `- url: ${i.url}\n  title: ${i.title}\n  description: ${i.descr
       relevanceScore: s.relevanceScore ?? 0,
       noveltyScore: s.noveltyScore ?? 0,
       importanceScore: s.importanceScore ?? 0,
+      contrarian_signal: s.contrarian_signal ?? false,
     })
   }
 
@@ -94,19 +97,45 @@ export async function synthesizeReport(
   scoredItems: ScoredItem[],
   config: LLMConfig,
 ): Promise<{ body: string; summary: string; costUsd: number }> {
-  const prompt = `You are a world intelligence analyst. Write a comprehensive markdown report covering today's most important global events.
-Use the following pre-scored news items as your source material.
+  const categories = [...new Set(scoredItems.map(i => i.category))].filter(Boolean)
+  const contrarianItems = scoredItems.filter(i => i.contrarian_signal)
 
-Items:
+  const prompt = `You are a world intelligence analyst writing for a European high-yield credit analyst.
+This report is used for daily briefings — it must be structured, factual, and actionable.
+
+Write a comprehensive markdown report covering today's most important global events using the pre-scored news items below.
+
+**Report header** (include at the top, before the first section):
+- Timestamp: ${new Date().toISOString().split('T')[0]}
+- Categories covered: ${categories.join(', ')} (${categories.length} total)
+- Sources count: ${scoredItems.length} items reviewed
+
+**Required sections — use these exact ## headings:**
+
+## Executive Summary
+3-5 sentences synthesizing the most significant developments across all categories.
+
+## Key Themes & Patterns
+Cross-category synthesis — identify threads connecting events across different categories. Not just per-category recap.
+
+## Critical Events
+Priority-flagged events. Mark each as **HIGH** or **MEDIUM** priority. Include source URL.
+
+## Opportunities
+Market angles — HY credit implications, macro positioning, spread implications. Be specific about which sectors/issuers.
+
+## Contrarian Angles
+What major outlets are underweighting or missing entirely.${contrarianItems.length > 0 ? `\nItems flagged as contrarian by triage: ${contrarianItems.map(i => `"${i.title}"`).join(', ')}` : ''}
+
+## Coverage Gaps
+Topics that should have news but don't — notable silences. What's NOT being covered that matters.
+
+**Source items:**
 ${scoredItems.map(i =>
-  `### ${i.title} [${i.category}]\nURL: ${i.url}\nImportance: ${i.importanceScore}/10\n${i.fullText || i.description}`
+  `### ${i.title} [${i.category}]${i.contrarian_signal ? ' 🔄 CONTRARIAN' : ''}\nURL: ${i.url}\nImportance: ${i.importanceScore}/10\n${i.fullText || i.description}`
 ).join('\n\n')}
 
-Write a structured markdown report with:
-1. A "# World Intelligence Report" heading with today's date
-2. An "## Executive Summary" section (2-3 sentences)
-3. Sections per category for notable events
-4. Keep it factual and analytical.`
+Keep it factual and analytical. Every claim must be traceable to a source item.`
 
   const result = await callLLM(prompt, config)
   const body = result.text
@@ -214,10 +243,14 @@ export async function runPipeline(): Promise<PipelineResult> {
   )
 
   const allScoredItems = categoryResults.flat()
-  const itemCount = allScoredItems.length
+
+  // Dedup: filter out articles already seen in previous reports
+  const dedupedItems = await filterSeenUrls(allScoredItems)
+
+  const itemCount = dedupedItems.length
   const sourceCount = enabledCategories.length
 
-  const { body, summary, costUsd } = await synthesizeReport(allScoredItems, synthesisConfig)
+  const { body, summary, costUsd } = await synthesizeReport(dedupedItems, synthesisConfig)
 
   const { v4: uuidv4 } = await import('uuid')
   const reportId = uuidv4()
@@ -238,6 +271,10 @@ export async function runPipeline(): Promise<PipelineResult> {
   }
 
   await saveReport(report)
+
+  // Mark all included article URLs as seen for future dedup
+  const articleUrls = dedupedItems.map(i => i.url).filter(Boolean)
+  await markArticlesSeen(articleUrls, reportId)
 
   return { reportId, costUsd, itemCount, sourceCount }
 }

@@ -1,0 +1,7 @@
+Task **wi-41y** complete.
+
+**What was done:** Replaced the raw `<pre>` report body renderer with `<ReactMarkdown remarkPlugins={[remarkGfm]}>` in `app/reports/[id]/page.tsx`. Added `@tailwindcss/typography` prose styling for clean headings, lists, tables, code blocks, bold/italic rendering.
+
+**Results:** 6 new tests, 99 total passing, build clean.
+
+**Next task:** `wi-2a8` — Synthesis and triage prompt upgrade for all 6 report sections (R3).

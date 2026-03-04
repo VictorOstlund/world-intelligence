@@ -2,7 +2,7 @@ You are working on the world-intelligence epic. This is one iteration of an adap
 The bash runner will re-launch you with fresh context after each task.
 
 ## Setup
-1. Load epic: npx bd show wi-ijs (immutable requirements, success criteria, anti-patterns)
+1. Load epic: npx bd show wi-eeg (immutable requirements, success criteria, anti-patterns)
 2. Find ready task: npx bd ready
 Read /home/node/.openclaw/workspaces/world-intelligence/plans/learnings.md for learnings from previous tasks.
 
@@ -18,13 +18,13 @@ Violating this rule wastes tokens and breaks the product.
 4. Close task: npx bd close <task_id> --reason "Implemented"
 
 ## After executing — Review and plan next:
-1. Re-read epic: npx bd show wi-ijs
+1. Re-read epic: npx bd show wi-eeg
 2. Review what you learned from this task
 3. Check: are ALL epic success criteria now met?
    - **YES** → skip creating next task, go to "Write checkpoint" below
    - **NO** → create the next logical task based on what you learned:
      npx bd create "Task N: [deliverable]" --type feature --priority 1 --design "## Goal\n[based on learnings]\n## Implementation\n[TDD steps, exact files]\n## Success Criteria\n[specific outcomes]"
-     npx bd dep add <new-task-id> wi-ijs --type parent-child
+     npx bd dep add <new-task-id> wi-eeg --type parent-child
 
 ## Write checkpoint (REQUIRED — this is how the bash runner knows what happened):
 
