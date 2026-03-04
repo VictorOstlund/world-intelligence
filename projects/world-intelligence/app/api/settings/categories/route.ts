@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { getActiveCategoryConfig, saveConfig } from '../../../../lib/db'
 
 export async function GET(_req: Request) {
-  const categories = getActiveCategoryConfig()
+  const categories = await getActiveCategoryConfig()
   return NextResponse.json(categories)
 }
 
@@ -18,6 +18,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'categoryConfig is required' }, { status: 400 })
   }
 
-  saveConfig({ category_config: JSON.stringify(body.categoryConfig) })
+  await saveConfig({ category_config: JSON.stringify(body.categoryConfig) })
   return NextResponse.json({ ok: true })
 }

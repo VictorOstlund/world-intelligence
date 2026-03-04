@@ -26,7 +26,7 @@ export const DEFAULT_CATEGORIES: Record<string, CategoryMeta> = {
 
 /**
  * Merges stored DB config with defaults. DB wins on enabled/budget.
- * Accepts either a parsed object or a JSON string (as stored in SQLite).
+ * Accepts either a parsed object or a JSON string (as stored in the database).
  */
 export function getCategoryConfig(dbConfig: CategoryConfig | string | null | undefined): CategoryConfig {
   let parsed: Partial<CategoryConfig> = {}

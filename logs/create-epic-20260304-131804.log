@@ -1,0 +1,7 @@
+Done. Everything was already in place from a prior run:
+
+- **Epic:** `wi-ijs` — "Feature: SQLite to Postgres migration" (all 6 design sections present)
+- **Task 1:** `wi-qi8` — "Task 1: Swap driver and rewrite lib/db.ts for Postgres" (linked as child of epic)
+- **Saved:** `plans/epic.json` → `{"epic_id": "wi-ijs", "task1_id": "wi-qi8", "slug": "world-intelligence"}`
+
+No code written. Ready for implementation.

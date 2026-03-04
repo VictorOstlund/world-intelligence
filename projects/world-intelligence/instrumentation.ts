@@ -18,7 +18,7 @@ export async function register() {
     let scheduleHours = parseInt(process.env.SCHEDULE_HOURS || '0', 10)
     if (!scheduleHours) {
       try {
-        const config = getConfig() as Record<string, unknown>
+        const config = await getConfig() as Record<string, unknown>
         scheduleHours = (config.schedule_hours as number) || 6
       } catch {
         scheduleHours = 6

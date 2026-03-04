@@ -1,7 +1,12 @@
-import { describe, it, expect, vi, beforeAll, afterAll, beforeEach } from 'vitest'
-import fs from 'fs'
-import path from 'path'
-import os from 'os'
+import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest'
+import { createMockStore, createMockSql } from '../helpers/mock-neon'
+
+const store = createMockStore()
+const mockSql = createMockSql(store)
+
+vi.doMock('@neondatabase/serverless', () => ({
+  neon: vi.fn().mockReturnValue(mockSql),
+}))
 
 // Mock LLM calls — must be hoisted before imports
 vi.mock('../../../lib/llm', () => ({
@@ -16,21 +21,17 @@ vi.mock('../../../lib/feeds', () => ({
   fetchFullArticle: vi.fn().mockResolvedValue('Full article text'),
 }))
 
-let tmpDir: string
-
 // Category names to enable in the test config
 const ENABLED_CATS = ['geopolitics', 'economics']
 
 beforeAll(async () => {
-  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wi-pipeline-test-'))
-  process.env.DATA_DIR = tmpDir
+  process.env.DATABASE_URL = 'postgresql://test:test@localhost/test'
   process.env.JWT_SECRET = 'test-secret-minimum-32-chars-long!!'
 
   const { initDb, saveConfig } = await import('../../../lib/db')
-  initDb()
+  await initDb()
 
   // Explicitly disable ALL categories except geopolitics and economics.
-  // This prevents unexpected LLM triage calls for the default-enabled 13 categories.
   const ALL_CAT_NAMES = [
     'geopolitics', 'economics', 'technology', 'climate', 'energy',
     'defense', 'finance', 'health', 'science', 'society', 'media',
@@ -40,7 +41,7 @@ beforeAll(async () => {
     ALL_CAT_NAMES.map(k => [k, { enabled: ENABLED_CATS.includes(k), itemBudget: 5 }])
   )
 
-  saveConfig({
+  await saveConfig({
     active_provider: 'anthropic',
     triage_model: 'gemini-1.5-flash-8b',
     synthesis_model: 'claude-sonnet-4-6',
@@ -52,10 +53,6 @@ beforeAll(async () => {
   })
 })
 
-afterAll(() => {
-  fs.rmSync(tmpDir, { recursive: true })
-})
-
 beforeEach(() => {
   vi.clearAllMocks()
 })
@@ -65,11 +62,6 @@ const triagedJson = JSON.stringify([
 ])
 
 const synthesisText = '# World Intelligence Report 2026-03-04\n\n## Executive Summary\nKey global events today.\n\n## Geopolitics\nTest event occurred.'
-
-function setupDefaultMocks() {
-  const { callLLM } = vi.mocked(vi.importMock('../../../lib/llm') as any)
-  // Not available — use the import approach inside each test
-}
 
 describe('POST /api/pipeline/run', () => {
   it('saves a report to DB and returns reportId on success', async () => {
@@ -83,7 +75,6 @@ describe('POST /api/pipeline/run', () => {
     vi.mocked(fetchCategory).mockResolvedValue([
       { title: 'Test Event', description: 'Something happened', url: 'https://example.com/1', pubDate: '2026-03-04', category: 'geopolitics' },
     ])
-    // Use mockImplementation to distinguish triage vs synthesis by prompt content
     vi.mocked(callLLM).mockImplementation(async (prompt: string) => {
       if (prompt.includes('triage agent')) {
         return { text: triagedJson, inputTokens: 100, outputTokens: 50 }
@@ -107,7 +98,7 @@ describe('POST /api/pipeline/run', () => {
 
     // Verify report was persisted to DB
     const { getReport } = await import('../../../lib/db')
-    const saved = getReport(json.reportId)
+    const saved = await getReport(json.reportId)
     expect(saved).not.toBeNull()
     expect(saved?.body).toContain('# World Intelligence Report')
     expect(saved?.summary).toBeTruthy()
@@ -194,7 +185,7 @@ describe('POST /api/pipeline/run', () => {
     const categoryConfig = Object.fromEntries(
       ALL_CAT_NAMES.map(k => [k, { enabled: FIVE_CATS.includes(k), itemBudget: 5 }])
     )
-    saveConfig({
+    await saveConfig({
       active_provider: 'anthropic',
       triage_model: 'gemini-1.5-flash-8b',
       synthesis_model: 'claude-sonnet-4-6',

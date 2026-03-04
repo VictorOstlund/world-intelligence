@@ -1,20 +1,22 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import fs from 'fs'
-import path from 'path'
-import os from 'os'
+import { describe, it, expect, beforeAll, vi } from 'vitest'
+import { createMockStore, createMockSql } from '../helpers/mock-neon'
 
-let tmpDir: string
+const store = createMockStore()
+const mockSql = createMockSql(store)
+
+vi.doMock('@neondatabase/serverless', () => ({
+  neon: vi.fn().mockReturnValue(mockSql),
+}))
 
 beforeAll(async () => {
-  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wi-settings-test-'))
-  process.env.DATA_DIR = tmpDir
+  process.env.DATABASE_URL = 'postgresql://test:test@localhost/test'
   process.env.JWT_SECRET = 'test-secret-minimum-32-chars-long!!'
 
   const { initDb, saveConfig } = await import('../../../lib/db')
-  initDb()
+  await initDb()
 
   // Seed config with a provider key
-  saveConfig({
+  await saveConfig({
     active_provider: 'anthropic',
     triage_model: 'gemini-1.5-flash-8b',
     synthesis_model: 'claude-sonnet-4-6',
@@ -27,10 +29,6 @@ beforeAll(async () => {
       openai: { apiKey: 'sk-openai-secret' },
     }),
   })
-})
-
-afterAll(() => {
-  fs.rmSync(tmpDir, { recursive: true })
 })
 
 describe('GET /api/settings', () => {
@@ -97,7 +95,7 @@ describe('POST /api/settings', () => {
 
     // Confirm it's stored (via direct db check, not via GET which redacts)
     const { getConfig } = await import('../../../lib/db')
-    const config = getConfig() as any
+    const config = await getConfig() as any
     const providers = typeof config.providers === 'string' ? JSON.parse(config.providers) : config.providers
     expect(providers?.anthropic?.apiKey).toBe('sk-ant-new-key')
   })

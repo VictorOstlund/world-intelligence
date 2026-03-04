@@ -1,107 +1,115 @@
-import Database from 'better-sqlite3'
-import path from 'path'
-import fs from 'fs'
+import { neon } from '@neondatabase/serverless'
 import { hashPassword } from './auth'
 import { getCategoryConfig } from './categories'
 
-const SCHEMA = `
-CREATE TABLE IF NOT EXISTS reports (
-  id TEXT PRIMARY KEY,
-  created_at INTEGER NOT NULL,
-  schedule TEXT NOT NULL,
-  categories TEXT NOT NULL,
-  summary TEXT NOT NULL,
-  body TEXT NOT NULL,
-  cost_usd REAL NOT NULL DEFAULT 0,
-  triage_model TEXT NOT NULL,
-  synthesis_model TEXT NOT NULL,
-  item_count INTEGER NOT NULL DEFAULT 0,
-  source_count INTEGER NOT NULL DEFAULT 0
-);
+type SqlFunction = ReturnType<typeof neon>
 
-CREATE TABLE IF NOT EXISTS config (
-  id INTEGER PRIMARY KEY CHECK (id = 1),
-  active_provider TEXT NOT NULL DEFAULT 'anthropic',
-  triage_model TEXT NOT NULL DEFAULT 'gemini-1.5-flash-8b',
-  synthesis_model TEXT NOT NULL DEFAULT 'claude-sonnet-4-6',
-  triage_fallbacks TEXT NOT NULL DEFAULT '[]',
-  synthesis_fallbacks TEXT NOT NULL DEFAULT '[]',
-  schedule_hours INTEGER NOT NULL DEFAULT 6,
-  category_config TEXT NOT NULL DEFAULT '{}',
-  providers TEXT NOT NULL DEFAULT '{}'
-);
+let _sql: SqlFunction | null = null
 
-CREATE TABLE IF NOT EXISTS users (
-  id TEXT PRIMARY KEY,
-  username TEXT UNIQUE NOT NULL,
-  password_hash TEXT NOT NULL,
-  created_at INTEGER NOT NULL
-);
-
-CREATE VIRTUAL TABLE IF NOT EXISTS reports_fts USING fts5(
-  id UNINDEXED,
-  body,
-  summary,
-  content='reports',
-  content_rowid='rowid'
-);
-`
-
-let _db: Database.Database | null = null
-
-export function initDb(): Database.Database {
-  const dataDir = process.env.DATA_DIR || './data'
-  if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true })
+function getSql(): SqlFunction {
+  if (!_sql) {
+    const url = process.env.DATABASE_URL
+    if (!url) throw new Error('DATABASE_URL environment variable is required')
+    _sql = neon(url)
   }
-  const dbPath = path.join(dataDir, 'world-intelligence.db')
-  const db = new Database(dbPath)
-  db.pragma('journal_mode = WAL')
-  db.exec(SCHEMA)
-  _db = db
-  return db
+  return _sql
 }
 
-export function getDb(): Database.Database {
-  if (!_db) {
-    return initDb()
-  }
-  return _db
+/** The neon driver supports string+params at runtime; this helper bypasses TS's template-only types */
+async function query(sqlStr: string, params?: unknown[]): Promise<Record<string, unknown>[]> {
+  return (getSql() as any)(sqlStr, params ?? []) as Promise<Record<string, unknown>[]>
 }
 
-export function getUser(username: string): { id: string; username: string; password_hash: string; created_at: number } | undefined {
-  return getDb().prepare('SELECT * FROM users WHERE username = ?').get(username) as any
+export async function initDb(): Promise<void> {
+  await query(`CREATE TABLE IF NOT EXISTS users (
+    id TEXT PRIMARY KEY,
+    username TEXT UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    created_at BIGINT NOT NULL
+  )`)
+
+  await query(`CREATE TABLE IF NOT EXISTS config (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    active_provider TEXT NOT NULL DEFAULT 'anthropic',
+    triage_model TEXT NOT NULL DEFAULT 'gemini-1.5-flash-8b',
+    synthesis_model TEXT NOT NULL DEFAULT 'claude-sonnet-4-6',
+    triage_fallbacks TEXT NOT NULL DEFAULT '[]',
+    synthesis_fallbacks TEXT NOT NULL DEFAULT '[]',
+    schedule_hours INTEGER NOT NULL DEFAULT 6,
+    category_config TEXT NOT NULL DEFAULT '{}',
+    providers TEXT NOT NULL DEFAULT '{}'
+  )`)
+
+  await query(`CREATE TABLE IF NOT EXISTS reports (
+    id TEXT PRIMARY KEY,
+    created_at BIGINT NOT NULL,
+    schedule TEXT NOT NULL,
+    categories TEXT NOT NULL,
+    summary TEXT NOT NULL,
+    body TEXT NOT NULL,
+    cost_usd REAL NOT NULL DEFAULT 0,
+    triage_model TEXT NOT NULL,
+    synthesis_model TEXT NOT NULL,
+    item_count INTEGER NOT NULL DEFAULT 0,
+    source_count INTEGER NOT NULL DEFAULT 0,
+    search_vector tsvector
+  )`)
+
+  await query(`CREATE INDEX IF NOT EXISTS reports_fts_idx ON reports USING GIN(search_vector)`)
+
+  await query(`
+    CREATE OR REPLACE FUNCTION reports_search_vector_update() RETURNS trigger AS $$
+    BEGIN
+      NEW.search_vector := to_tsvector('english', coalesce(NEW.body,'') || ' ' || coalesce(NEW.summary,''));
+      RETURN NEW;
+    END
+    $$ LANGUAGE plpgsql
+  `)
+
+  await query(`DROP TRIGGER IF EXISTS reports_search_vector_trigger ON reports`)
+  await query(`CREATE TRIGGER reports_search_vector_trigger BEFORE INSERT OR UPDATE ON reports FOR EACH ROW EXECUTE FUNCTION reports_search_vector_update()`)
+}
+
+export async function getUser(username: string): Promise<{ id: string; username: string; password_hash: string; created_at: number } | undefined> {
+  const rows = await query('SELECT * FROM users WHERE username = $1', [username])
+  if (!rows[0]) return undefined
+  return { ...rows[0], created_at: Number(rows[0].created_at) } as any
 }
 
 export async function createUser(username: string, password: string): Promise<void> {
   const { v4: uuidv4 } = await import('uuid')
   const hash = await hashPassword(password)
-  getDb().prepare('INSERT INTO users (id, username, password_hash, created_at) VALUES (?, ?, ?, ?)').run(
+  await query('INSERT INTO users (id, username, password_hash, created_at) VALUES ($1, $2, $3, $4)', [
     uuidv4(),
     username,
     hash,
-    Date.now()
-  )
+    Date.now(),
+  ])
 }
 
-export function getConfig(): Record<string, unknown> {
-  const row = getDb().prepare('SELECT * FROM config WHERE id = 1').get() as any
-  if (!row) return {}
-  // Never return providers field directly - callers must handle that
+export async function getConfig(): Promise<Record<string, unknown>> {
+  const rows = await query('SELECT * FROM config WHERE id = 1')
+  if (!rows[0]) return {}
+  const row = rows[0] as Record<string, unknown>
+  if (row.schedule_hours !== undefined) row.schedule_hours = Number(row.schedule_hours)
   return row
 }
 
-export function saveConfig(updates: Record<string, unknown>): void {
-  const existing = getConfig()
-  const merged = { ...existing, ...updates, id: 1 }
-  const cols = Object.keys(merged).join(', ')
-  const vals = Object.keys(merged).map(() => '?').join(', ')
-  const params = Object.values(merged)
-  getDb().prepare(`INSERT OR REPLACE INTO config (${cols}) VALUES (${vals})`).run(...params)
+export async function saveConfig(updates: Record<string, unknown>): Promise<void> {
+  const existing = await getConfig()
+  const merged: Record<string, unknown> = { ...existing, ...updates, id: 1 }
+  const cols = Object.keys(merged)
+  const placeholders = cols.map((_, i) => `$${i + 1}`).join(', ')
+  const setClauses = cols.filter(c => c !== 'id').map(c => `${c} = EXCLUDED.${c}`).join(', ')
+  const params = cols.map(c => merged[c])
+  await query(
+    `INSERT INTO config (${cols.join(', ')}) VALUES (${placeholders}) ON CONFLICT (id) DO UPDATE SET ${setClauses}`,
+    params,
+  )
 }
 
-export function getActiveCategoryConfig(): Record<string, { enabled: boolean; itemBudget: number }> {
-  const row = getConfig()
+export async function getActiveCategoryConfig(): Promise<Record<string, { enabled: boolean; itemBudget: number }>> {
+  const row = await getConfig()
   const dbCategoryConfig = (row as any)?.category_config || '{}'
   let parsed: Record<string, { enabled: boolean; itemBudget: number }> = {}
   try {
@@ -126,44 +134,76 @@ export interface Report {
   source_count: number
 }
 
-export function saveReport(report: Report): void {
-  const db = getDb()
-  db.prepare(`
-    INSERT OR REPLACE INTO reports
-      (id, created_at, schedule, categories, summary, body, cost_usd, triage_model, synthesis_model, item_count, source_count)
-    VALUES
-      (@id, @created_at, @schedule, @categories, @summary, @body, @cost_usd, @triage_model, @synthesis_model, @item_count, @source_count)
-  `).run(report)
-  // Update FTS index
-  db.prepare(`INSERT OR REPLACE INTO reports_fts(rowid, id, body, summary) SELECT rowid, id, body, summary FROM reports WHERE id = ?`).run(report.id)
+function parseReport(row: Record<string, unknown>): Report {
+  return {
+    id: row.id as string,
+    created_at: Number(row.created_at),
+    schedule: row.schedule as string,
+    categories: row.categories as string,
+    summary: row.summary as string,
+    body: row.body as string,
+    cost_usd: Number(row.cost_usd),
+    triage_model: row.triage_model as string,
+    synthesis_model: row.synthesis_model as string,
+    item_count: Number(row.item_count),
+    source_count: Number(row.source_count),
+  }
 }
 
-export function getReport(id: string): Report | null {
-  return (getDb().prepare('SELECT * FROM reports WHERE id = ?').get(id) as Report | undefined) ?? null
+export async function saveReport(report: Report): Promise<void> {
+  await query(
+    `INSERT INTO reports (id, created_at, schedule, categories, summary, body, cost_usd, triage_model, synthesis_model, item_count, source_count)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+     ON CONFLICT (id) DO UPDATE SET
+       created_at = EXCLUDED.created_at,
+       schedule = EXCLUDED.schedule,
+       categories = EXCLUDED.categories,
+       summary = EXCLUDED.summary,
+       body = EXCLUDED.body,
+       cost_usd = EXCLUDED.cost_usd,
+       triage_model = EXCLUDED.triage_model,
+       synthesis_model = EXCLUDED.synthesis_model,
+       item_count = EXCLUDED.item_count,
+       source_count = EXCLUDED.source_count`,
+    [report.id, report.created_at, report.schedule, report.categories, report.summary, report.body, report.cost_usd, report.triage_model, report.synthesis_model, report.item_count, report.source_count],
+  )
 }
 
-export function getReports(limit: number, offset: number): Report[] {
-  return getDb().prepare('SELECT * FROM reports ORDER BY created_at DESC LIMIT ? OFFSET ?').all(limit, offset) as Report[]
+export async function getReport(id: string): Promise<Report | null> {
+  const rows = await query('SELECT * FROM reports WHERE id = $1', [id])
+  if (!rows[0]) return null
+  return parseReport(rows[0])
 }
 
-export function searchReports(query: string, limit: number): Report[] {
+export async function getReports(limit: number, offset: number): Promise<Report[]> {
+  const rows = await query('SELECT * FROM reports ORDER BY created_at DESC LIMIT $1 OFFSET $2', [limit, offset])
+  return rows.map(r => parseReport(r))
+}
+
+export async function getReportCount(): Promise<number> {
+  const rows = await query('SELECT COUNT(*) as n FROM reports')
+  return Number(rows[0]?.n ?? 0)
+}
+
+export async function searchReports(queryStr: string, limit: number): Promise<Report[]> {
   try {
-    const rows = getDb().prepare(`
-      SELECT r.* FROM reports r
-      JOIN reports_fts fts ON fts.id = r.id
-      WHERE reports_fts MATCH ?
-      ORDER BY rank
-      LIMIT ?
-    `).all(query, limit) as Report[]
-    return rows
+    const rows = await query(
+      `SELECT id, created_at, schedule, categories, summary, body, cost_usd, triage_model, synthesis_model, item_count, source_count
+       FROM reports
+       WHERE search_vector @@ plainto_tsquery('english', $1)
+       ORDER BY ts_rank(search_vector, plainto_tsquery('english', $1)) DESC
+       LIMIT $2`,
+      [queryStr, limit],
+    )
+    return rows.map(r => parseReport(r))
   } catch {
     return []
   }
 }
 
 export async function seedIfEmpty(): Promise<void> {
-  const db = getDb()
-  const count = (db.prepare('SELECT COUNT(*) as n FROM users').get() as { n: number }).n
+  const rows = await query('SELECT COUNT(*) as n FROM users')
+  const count = Number(rows[0]?.n ?? 0)
   if (count === 0) {
     const username = process.env.INITIAL_ADMIN_USERNAME || 'admin'
     const password = process.env.INITIAL_ADMIN_PASSWORD || 'changeme'

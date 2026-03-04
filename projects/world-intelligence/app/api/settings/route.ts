@@ -19,7 +19,7 @@ function redactProviders(providers: unknown): unknown {
 }
 
 export async function GET(_req: Request) {
-  const config = getConfig() as Record<string, unknown>
+  const config = await getConfig() as Record<string, unknown>
   // Parse providers JSON if stored as string
   let providers: unknown = config.providers
   if (typeof providers === 'string') {
@@ -46,6 +46,6 @@ export async function POST(req: Request) {
     body = { ...body, providers: JSON.stringify(body.providers) }
   }
 
-  saveConfig(body)
+  await saveConfig(body)
   return NextResponse.json({ ok: true })
 }

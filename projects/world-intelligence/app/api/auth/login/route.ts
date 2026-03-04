@@ -15,7 +15,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'invalid credentials' }, { status: 401 })
   }
 
-  const user = getUser(username)
+  const user = await getUser(username)
   if (!user) {
     return NextResponse.json({ error: 'invalid credentials' }, { status: 401 })
   }

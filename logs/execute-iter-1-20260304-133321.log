@@ -1,0 +1,6 @@
+**Task wi-qi8 complete.** Summary:
+
+- **Problem:** 5 test suites failed because `vi.mock` factory is hoisted above `const mockSql = createMockSql(store)`, making `mockSql` undefined at mock-creation time
+- **Fix:** Changed `vi.mock` → `vi.doMock` in all 5 failing test files (auth, reports, settings, pipeline, db/reports). `vi.doMock` is not hoisted, so it runs after `mockSql` is defined
+- **Result:** 83 tests pass, `npm run build` succeeds with no TypeScript errors
+- **Next task:** wi-e7j — Neon provisioning script for Vercel deployment

@@ -1,25 +1,21 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import Database from 'better-sqlite3'
-import fs from 'fs'
-import path from 'path'
-import os from 'os'
+import { describe, it, expect, beforeAll, beforeEach } from 'vitest'
+import { createMockStore, createMockSql } from '../helpers/mock-neon'
+import { vi } from 'vitest'
 
-let tmpDir: string
+const store = createMockStore()
+const mockSql = createMockSql(store)
+
+vi.doMock('@neondatabase/serverless', () => ({
+  neon: vi.fn().mockReturnValue(mockSql),
+}))
 
 beforeAll(async () => {
-  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wi-reports-test-'))
-  process.env.DATA_DIR = tmpDir
-
-  // Reset module cache so initDb picks up new DATA_DIR
+  process.env.DATABASE_URL = 'postgresql://test:test@localhost/test'
   const { initDb } = await import('../../../lib/db')
-  initDb()
+  await initDb()
 })
 
-afterAll(() => {
-  if (tmpDir) fs.rmSync(tmpDir, { recursive: true })
-})
-
-const makeReport = (overrides: Partial<Parameters<(typeof import('../../../lib/db'))['saveReport']>[0]> = {}) => ({
+const makeReport = (overrides: Record<string, unknown> = {}) => ({
   id: `report-${Date.now()}-${Math.random()}`,
   created_at: Date.now(),
   schedule: '6h',
@@ -38,9 +34,9 @@ describe('saveReport', () => {
   it('inserts a report and it can be retrieved', async () => {
     const { saveReport, getReport } = await import('../../../lib/db')
     const report = makeReport()
-    saveReport(report)
+    await saveReport(report as any)
 
-    const retrieved = getReport(report.id)
+    const retrieved = await getReport(report.id)
     expect(retrieved).toBeTruthy()
     expect(retrieved!.id).toBe(report.id)
     expect(retrieved!.summary).toBe(report.summary)
@@ -49,9 +45,9 @@ describe('saveReport', () => {
   it('stores cost_usd correctly', async () => {
     const { saveReport, getReport } = await import('../../../lib/db')
     const report = makeReport({ cost_usd: 1.2345 })
-    saveReport(report)
+    await saveReport(report as any)
 
-    const retrieved = getReport(report.id)
+    const retrieved = await getReport(report.id)
     expect(retrieved!.cost_usd).toBeCloseTo(1.2345)
   })
 })
@@ -61,10 +57,10 @@ describe('getReports', () => {
     const { saveReport, getReports } = await import('../../../lib/db')
     const r1 = makeReport({ id: 'r-oldest', created_at: 1000, summary: 'Oldest' })
     const r2 = makeReport({ id: 'r-newest', created_at: 9999, summary: 'Newest' })
-    saveReport(r1)
-    saveReport(r2)
+    await saveReport(r1 as any)
+    await saveReport(r2 as any)
 
-    const results = getReports(10, 0)
+    const results = await getReports(10, 0)
     expect(results.length).toBeGreaterThanOrEqual(2)
     // Newest first
     const newIdx = results.findIndex(r => r.id === 'r-newest')
@@ -74,8 +70,8 @@ describe('getReports', () => {
 
   it('respects limit and offset', async () => {
     const { getReports } = await import('../../../lib/db')
-    const page1 = getReports(1, 0)
-    const page2 = getReports(1, 1)
+    const page1 = await getReports(1, 0)
+    const page2 = await getReports(1, 1)
     expect(page1.length).toBe(1)
     expect(page2.length).toBe(1)
     expect(page1[0].id).not.toBe(page2[0].id)
@@ -91,9 +87,9 @@ describe('searchReports', () => {
       body: `# Report\n\nSomething about ${uniqueWord} in today's geopolitics.`,
       summary: 'FTS test report',
     })
-    saveReport(report)
+    await saveReport(report as any)
 
-    const results = searchReports(uniqueWord, 10)
+    const results = await searchReports(uniqueWord, 10)
     expect(results.some(r => r.id === 'fts-test-report')).toBe(true)
   })
 
@@ -104,15 +100,15 @@ describe('searchReports', () => {
       id: 'fts-summary-report',
       summary: `Summary with ${uniqueWord}`,
     })
-    saveReport(report)
+    await saveReport(report as any)
 
-    const results = searchReports(uniqueWord, 10)
+    const results = await searchReports(uniqueWord, 10)
     expect(results.some(r => r.id === 'fts-summary-report')).toBe(true)
   })
 
   it('returns empty array when no match', async () => {
     const { searchReports } = await import('../../../lib/db')
-    const results = searchReports('xyzxyz_no_match_term_12345', 10)
+    const results = await searchReports('xyzxyz_no_match_term_12345', 10)
     expect(results).toEqual([])
   })
 })

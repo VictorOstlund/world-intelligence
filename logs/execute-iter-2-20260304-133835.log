@@ -1,0 +1,8 @@
+Done. Task `wi-e7j` complete, epic `wi-ijs` fully closed.
+
+**Summary:**
+- Created `scripts/provision-neon.ts` — uses Vercel REST API (v9 env vars, v13 deployments) to set `DATABASE_URL` and trigger production redeploy
+- 6 new tests covering: import, missing env vars, create/update env var, redeploy fallback
+- Updated `.env.example` with `DATABASE_URL` placeholder
+- **89 tests pass**, build clean
+- Epic complete — ready for finish stage with a real `DATABASE_URL`

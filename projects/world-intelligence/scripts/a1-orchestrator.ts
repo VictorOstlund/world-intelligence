@@ -28,7 +28,7 @@ async function main() {
 
     // The report body is stored in DB; retrieve it for file write
     const { getReport } = await import('../lib/db')
-    const report = getReport(result.reportId)
+    const report = await getReport(result.reportId)
 
     if (report) {
       fs.writeFileSync(reportFile, report.body, 'utf8')

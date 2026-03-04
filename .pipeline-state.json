@@ -1,14 +1,16 @@
 {
   "slug": "world-intelligence",
   "job_id": "world-intelligence-1772626947",
-  "current_stage": "finish",
-  "status": "running",
+  "current_stage": "done",
+  "status": "complete",
   "completed_stages": [
     "create-epic",
     "execute-iter-1",
     "execute-iter-2",
     "execute",
-    "review"
+    "review",
+    "finish",
+    "done"
   ],
   "stage_timings": {
     "create-epic": {
@@ -31,8 +33,9 @@
       "completed_at": "2026-03-04T12:31:00Z"
     },
     "finish": {
-      "started_at": "2026-03-04T12:31:00Z"
+      "started_at": "2026-03-04T12:31:00Z",
+      "completed_at": "2026-03-04T12:35:14Z"
     }
   },
-  "updated": "2026-03-04T12:31:00.183933Z"
+  "updated": "2026-03-04T12:35:14.192386Z"
 }

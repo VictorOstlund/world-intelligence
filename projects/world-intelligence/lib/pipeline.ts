@@ -186,8 +186,8 @@ export interface PipelineResult {
  * - Saves to DB
  */
 export async function runPipeline(): Promise<PipelineResult> {
-  const config = getConfig() as Record<string, unknown>
-  const categoryConfig = getActiveCategoryConfig()
+  const config = await getConfig() as Record<string, unknown>
+  const categoryConfig = await getActiveCategoryConfig()
 
   const triageConfig = buildLLMConfig(config, 'triage_model', 'triage_fallbacks')
   const synthesisConfig = buildLLMConfig(config, 'synthesis_model', 'synthesis_fallbacks')
@@ -237,7 +237,7 @@ export async function runPipeline(): Promise<PipelineResult> {
     source_count: sourceCount,
   }
 
-  saveReport(report)
+  await saveReport(report)
 
   return { reportId, costUsd, itemCount, sourceCount }
 }

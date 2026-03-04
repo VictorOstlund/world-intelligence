@@ -1,0 +1,32 @@
+
+════════════ STAGE: create-epic | 2026-03-04 13:18:59 UTC ════════════
+Done. Everything was already in place from a prior run:
+
+- **Epic:** `wi-ijs` — "Feature: SQLite to Postgres migration" (all 6 design sections present)
+- **Task 1:** `wi-qi8` — "Task 1: Swap driver and rewrite lib/db.ts for Postgres" (linked as child of epic)
+- **Saved:** `plans/epic.json` → `{"epic_id": "wi-ijs", "task1_id": "wi-qi8", "slug": "world-intelligence"}`
+
+No code written. Ready for implementation.
+
+════════════ STAGE: execute-iter-1 | 2026-03-04 13:38:34 UTC ════════════
+**Task wi-qi8 complete.** Summary:
+
+- **Problem:** 5 test suites failed because `vi.mock` factory is hoisted above `const mockSql = createMockSql(store)`, making `mockSql` undefined at mock-creation time
+- **Fix:** Changed `vi.mock` → `vi.doMock` in all 5 failing test files (auth, reports, settings, pipeline, db/reports). `vi.doMock` is not hoisted, so it runs after `mockSql` is defined
+- **Result:** 83 tests pass, `npm run build` succeeds with no TypeScript errors
+- **Next task:** wi-e7j — Neon provisioning script for Vercel deployment
+
+════════════ STAGE: execute-iter-2 | 2026-03-04 13:42:12 UTC ════════════
+Done. Task `wi-e7j` complete, epic `wi-ijs` fully closed.
+
+**Summary:**
+- Created `scripts/provision-neon.ts` — uses Vercel REST API (v9 env vars, v13 deployments) to set `DATABASE_URL` and trigger production redeploy
+- 6 new tests covering: import, missing env vars, create/update env var, redeploy fallback
+- Updated `.env.example` with `DATABASE_URL` placeholder
+- **89 tests pass**, build clean
+- Epic complete — ready for finish stage with a real `DATABASE_URL`
+
+════════════ STAGE: review | 2026-03-04 13:46:42 UTC ════════════
+Review complete. **Stage summary written to `plans/stage_summary.json`**: `{"stage": "review", "summary": "gaps-fixed", "gaps_found": 1, "gaps_fixed": 1}`.
+
+The implementation faithfully matches the epic spec. The one gap (stale "SQLite" comment in `categories.ts`) was fixed immediately. All 89 tests pass, build is clean, and every anti-pattern was verified absent.

@@ -1,24 +1,20 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import Database from 'better-sqlite3'
-import fs from 'fs'
-import path from 'path'
-import os from 'os'
+import { describe, it, expect, beforeAll, vi } from 'vitest'
+import { createMockStore, createMockSql } from '../helpers/mock-neon'
 
-let tmpDir: string
+const store = createMockStore()
+const mockSql = createMockSql(store)
+
+vi.doMock('@neondatabase/serverless', () => ({
+  neon: vi.fn().mockReturnValue(mockSql),
+}))
 
 beforeAll(async () => {
-  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wi-auth-test-'))
-  process.env.DATA_DIR = tmpDir
+  process.env.DATABASE_URL = 'postgresql://test:test@localhost/test'
   process.env.JWT_SECRET = 'test-secret-minimum-32-chars-long!!'
 
-  // Init db and create test user
   const { initDb, createUser } = await import('../../../lib/db')
-  initDb()
+  await initDb()
   await createUser('testuser', 'testpass123')
-})
-
-afterAll(() => {
-  fs.rmSync(tmpDir, { recursive: true })
 })
 
 describe('POST /api/auth/login', () => {
